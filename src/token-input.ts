@@ -12,7 +12,7 @@ export async function readToken(fromStdin: boolean): Promise<string> {
     }
   } else {
     if (!process.stdin.isTTY || !process.stderr.isTTY)
-      throw new JevError('NEEDS_INPUT', '交互登录需要终端；自动化请使用 --with-token 从标准输入读取 Key。');
+      throw new JevError('NEEDS_INPUT', '交互登录需要终端；自动化请先执行 jev-browser auth login --with-token 从标准输入读取 Key。');
     value = await hiddenToken();
   }
   value = value.trim();

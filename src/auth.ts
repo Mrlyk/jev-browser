@@ -4,14 +4,23 @@ import { JevError } from './errors.js';
 import { readToken } from './token-input.js';
 
 const help = `模型凭据：
-  jev-browser auth login typesafe|openrouter [--with-token]
+  jev-browser auth login [typesafe|openrouter] [--with-token]
   jev-browser auth status [--json]
   jev-browser auth logout typesafe|openrouter
 login 通过隐藏输入或 stdin 接收 Key，发送一次最小 Jev 请求，成功后保存。
+省略提供方时，sh- 开头的 Key 使用 OpenRouter，其余使用 TypeSafe 官方。
 同一提供方的环境变量覆盖本地 Key；两个提供方均可用时优先 TypeSafe。
 logout 仅删除本地 Key；status 显示配置来源，不请求模型或显示 Key。
 网站账号命令 auth save/list/show/delete 和 auth login <其他名称> 保持原有用途。
 `;
+
+export async function ensureLogin(): Promise<void> {
+  if (credentialStatus().selected) return;
+  process.stderr.write('尚未登录，请输入模型 API Key（sh- 开头使用 OpenRouter，其余使用 TypeSafe 官方）。\n');
+  const key = await readToken(false);
+  const result = await login(key.startsWith('sh-') ? 'openrouter' : 'typesafe', key);
+  process.stderr.write(`Jev 检查通过，已保存 ${result.provider} Key。\n`);
+}
 
 export async function login(provider: Provider, key: string, options: { env?: NodeJS.ProcessEnv; request?: typeof fetch } = {}) {
   if (!validKey(key)) throw new JevError('INVALID_API_KEY', 'API Key 为空或格式无效。');
@@ -35,10 +44,12 @@ export async function login(provider: Provider, key: string, options: { env?: No
 export async function handleAuth(args: string[], json = false): Promise<boolean> {
   json ||= args.includes('--json');
   const rest = args.filter(arg => arg !== '--json');
-  const [command, provider, ...flags] = rest;
+  const [command, ...parameters] = rest;
+  const provider = parameters[0]?.startsWith('-') ? undefined : parameters[0];
+  const flags = provider ? parameters.slice(1) : parameters;
   const modelProvider = providers.includes(provider as Provider);
   const wantsHelp = ['login', 'logout', 'status'].includes(command) &&
-    ((!provider || modelProvider) && flags.some(flag => ['--help', '-h'].includes(flag)) || ['--help', '-h'].includes(provider));
+    (!provider || modelProvider) && flags.some(flag => ['--help', '-h'].includes(flag));
   if (!command || ['--help', '-h', 'help'].includes(command) || wantsHelp) {
     process.stdout.write(json ? JSON.stringify({ success: true, data: { help } }) + '\n' : help);
     return true;
@@ -46,12 +57,14 @@ export async function handleAuth(args: string[], json = false): Promise<boolean>
   if (command !== 'status' && command !== 'logout' && !(command === 'login' && (!provider || modelProvider || rest.includes('--with-token'))))
     return false;
   if ((command === 'status' && rest.length !== 1) ||
-    (command !== 'status' && (!modelProvider || flags.length > 1 ||
+    (command !== 'status' && ((provider ? !modelProvider : command !== 'login') || flags.length > 1 ||
       flags.some(flag => command !== 'login' || flag !== '--with-token'))))
-    throw new JevError('INVALID_ARGUMENT', '用法：auth login typesafe|openrouter [--with-token]；auth status；auth logout typesafe|openrouter。');
+    throw new JevError('INVALID_ARGUMENT', '用法：auth login [typesafe|openrouter] [--with-token]；auth status；auth logout typesafe|openrouter。');
   let data;
-  if (command === 'login') data = await login(provider as Provider, await readToken(flags.includes('--with-token')));
-  else if (command === 'logout') {
+  if (command === 'login') {
+    const key = await readToken(flags.includes('--with-token'));
+    data = await login((provider as Provider | undefined) ?? (key.startsWith('sh-') ? 'openrouter' : 'typesafe'), key);
+  } else if (command === 'logout') {
     await saveCredential(provider as Provider, undefined);
     data = { removed: provider, ...credentialStatus() };
   } else data = credentialStatus();

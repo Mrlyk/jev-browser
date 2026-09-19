@@ -42,7 +42,7 @@ and use it for browser tasks in this project.
 Use an OpenRouter or TypeSafe API key. With a source build, save it once:
 
 ```bash
-jev-browser auth login openrouter  # Enter your Key to verify and save; or use typesafe
+jev-browser auth login             # Enter a Key to detect its provider, verify and save
 jev-browser auth status            # Check the active provider
 jev-browser auth logout openrouter # Remove the saved Key
 ```
@@ -53,6 +53,8 @@ For npm 0.1.1 or CI, use an environment variable:
 export OPENROUTER_API_KEY="your OpenRouter key"
 # Or: export TYPESAFE_API_KEY="your TypeSafe key"
 ```
+
+Commands automatically prompt for login when no Key is configured, then continue after successful login. Help, version and model credential management remain available without login. Keys starting with `sh-` are saved for OpenRouter; all others use TypeSafe. An explicit `auth login openrouter` or `auth login typesafe` overrides detection. For non-interactive setup, pipe the Key to `auth login --with-token`.
 
 Environment variables override saved Keys for the same provider. When both providers have a Key, TypeSafe takes priority.
 
@@ -102,7 +104,7 @@ jev-browser --session hotel act --op click 'Confirm booking button' --dry-run --
 printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill 'Password field' --value-stdin
 ```
 
-When you know the selector, use commands such as `click '#submit'` or `fill '#name' 'Alex'` directly. These do not need a model key. Run `jev-browser --help` or `jev-browser help` for more options.
+When you know the selector, use commands such as `click '#submit'` or `fill '#name' 'Alex'` directly. After login, these execute without calling the model. Run `jev-browser --help` or `jev-browser help` for more options.
 
 ## 3. How it works
 

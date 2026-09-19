@@ -7,11 +7,13 @@ Use for browser ownership, CDP, saved login state, and credential input. Adapted
 Current source builds add local model credentials; npm 0.1.1 uses environment variables only.
 
 ```bash
-jev-browser auth login openrouter  # Or typesafe; hidden input in a human terminal
+jev-browser auth login  # Hidden input; sh- uses OpenRouter, other keys use TypeSafe
 printf '%s' "$OPENROUTER_API_KEY" | jev-browser auth login openrouter --with-token
 jev-browser auth status --json
 jev-browser auth logout openrouter
 ```
+
+Commands without a configured Key prompt for login and resume after success. Help, version and model credential management do not require login. Explicit provider names override prefix detection. Non-interactive commands never consume their stdin as a Key; configure credentials first.
 
 Use one input method. `login` validates the submitted Key with one small, fixed-text Jev decision request before saving; it opens no browser, incurs a small API charge, and preserves the old Key on failure. Use stdin for an authorized automated setup; keep the Key out of arguments, logs, and prompts. Do not use a model-selected Key or silently change provider after a failed check.
 

@@ -6,7 +6,7 @@ import { act } from './semantic.js';
 import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
 import { readCredentials } from './credentials.js';
-import { handleAuth } from './auth.js';
+import { ensureLogin, handleAuth } from './auth.js';
 
 const help = `jev-browser 0.1.1 — Jev 语义浏览器 CLI
 
@@ -14,12 +14,13 @@ const help = `jev-browser 0.1.1 — Jev 语义浏览器 CLI
 
   open <url>                 打开页面；缺少本地 Chrome 时自动准备
   snapshot --json            读取结构化页面快照
-  click @e1 / fill @e2 值     确定性命令，无需模型 Key
+  click @e1 / fill @e2 值     确定性命令，不调用模型
   act "点击入住信息的确认"     一次选择并执行一个原子操作
   act --op fill "姓名" --value "张三"
   act --op fill "密码" --value-stdin
   act "点击确认" --dry-run --json
-  auth login typesafe|openrouter [--with-token]  验证 Jev 并保存 Key
+  auth login                交互输入 Key，自动识别提供方并保存
+  auth login [typesafe|openrouter] [--with-token]  指定提供方或从管道登录
   auth status / auth logout <提供方>             查看来源 / 删除本地 Key
 
 act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
@@ -29,6 +30,8 @@ act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
 
 同一提供方环境变量覆盖本地 Key；TypeSafe 官方优先，未配置时使用 OpenRouter。
 模型可用 TYPESAFE_MODEL / OPENROUTER_MODEL 固定；失败不切换通道。
+未配置 Key 时，执行命令前自动登录；帮助、版本和模型凭据管理无需登录。
+自动识别：sh- 开头使用 OpenRouter，其余使用 TypeSafe 官方。
 `;
 
 async function stdinValue(): Promise<string> {
@@ -52,6 +55,9 @@ async function main(): Promise<void> {
   const parsed = parseArgs(args);
   if (parsed.name === 'auth' && await handleAuth(parsed.rest, parsed.json)) return;
   if (parsed.name === 'help' && parsed.rest[0] === 'auth') { await handleAuth(['--help'], parsed.json); return; }
+  const showingHelp = !parsed.name || parsed.name === 'help' || parsed.rest.some(arg => ['--help', '-h'].includes(arg));
+  if (parsed.name === 'help' && !parsed.rest.length) process.stdout.write(help + '\n');
+  if (!showingHelp) await ensureLogin();
   if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser-cli 更新完整安装包。');
   if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', '首版尚未打包上游 Dashboard。');
   const browser = new Browser(parsed.globals);

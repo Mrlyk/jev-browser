@@ -117,7 +117,7 @@ test('invalid stores and symlinks fail without disclosing contents or overwritin
 test('website authentication remains routed to the executor', async () => {
   for (const args of [['login', 'github'], ['save', 'work'], ['list'], ['show', 'work'], ['delete', 'work']])
     assert.equal(await handleAuth(args), false);
-  for (const args of [['login'], ['logout', 'unknown'], ['status', 'extra'], ['login', 'openrouter', '--key', 'secret']])
+  for (const args of [['logout', 'unknown'], ['status', 'extra'], ['login', 'openrouter', '--key', 'secret']])
     await assert.rejects(handleAuth(args), error => error.code === 'INVALID_ARGUMENT' && !error.message.includes('secret'));
 });
 
@@ -149,4 +149,80 @@ test('CLI stdin login, JSON status and logout work without browser/key echo', t 
   const logout = run(['auth', 'logout', 'openrouter', '--json']);
   assert.equal(JSON.parse(logout.stdout).data.selected, null);
   assert.deepEqual(readCredentials(env), {});
+  for (const [key, provider] of [['sh-piped', 'openrouter'], ['official-piped', 'typesafe']]) {
+    const inferred = run(['auth', 'login', '--with-token', '--json'], key + '\n');
+    assert.equal(inferred.status, 0, inferred.stderr);
+    assert.equal(JSON.parse(inferred.stdout).data.provider, provider);
+    assert.equal(readCredentials(env)[provider], key);
+  }
+});
+
+test('CLI detects providers, prompts before execution, resumes once and preserves JSON output', t => {
+  const { root, env } = fixture(t);
+  const hook = join(root, 'interactive.mjs');
+  writeFileSync(hook, `
+    import { Browser } from ${JSON.stringify(new URL('../dist/browser.js', import.meta.url).href)};
+    globalThis.fetch = async (url, init) => {
+      const key = init.headers.Authorization.slice(7);
+      const provider = key.startsWith('sh-') ? 'openrouter' : 'typesafe';
+      if (!url.includes(provider === 'openrouter' ? 'openrouter.ai' : 'typesafe.ai')) throw Error('wrong provider');
+      return process.env.TEST_REJECT ? new Response('', { status: 401 }) : Response.json(${JSON.stringify(response())});
+    };
+    if (process.env.TEST_KEY) {
+      process.stdin.isTTY = process.stderr.isTTY = true;
+      process.stdin.resume = () => process.stdin;
+      process.stdin.setRawMode = enabled => {
+        if (enabled) setImmediate(() => {
+          process.stdin.emit('keypress', process.env.TEST_KEY, {});
+          process.stdin.emit('keypress', '', { name: process.env.TEST_CANCEL ? 'c' : 'return', ctrl: !!process.env.TEST_CANCEL });
+        });
+      };
+    }
+    Browser.prototype.passthrough = async function (args) {
+      process.stdout.write(JSON.stringify({ executed: args }) + '\\n');
+      return 0;
+    };
+  `);
+  const childEnv = { ...process.env, ...env, TYPESAFE_API_KEY: '', OPENROUTER_API_KEY: '',
+    NODE_OPTIONS: '', JEV_BROWSER_RUNTIME_DIR: join(root, 'runtime') };
+  const run = (args, options = {}) => spawnSync(process.execPath, ['--import', hook, 'dist/cli.js', ...args],
+    { env: { ...childEnv, ...options }, encoding: 'utf8', timeout: 10000 });
+  for (const [key, provider] of [['sh-router-test', 'openrouter'], ['official-test', 'typesafe']]) {
+    const explicit = run(['auth', 'login', '--json'], { TEST_KEY: key });
+    assert.equal(explicit.status, 0, explicit.stderr);
+    assert.equal(JSON.parse(explicit.stdout).data.provider, provider);
+    assert.equal(readCredentials(env)[provider], key);
+    rmSync(credentialsPath(env));
+    const automatic = run(['--json', 'open', 'https://example.test'], { TEST_KEY: key });
+    assert.equal(automatic.status, 0, automatic.stderr);
+    assert.deepEqual(JSON.parse(automatic.stdout), { executed: ['open', 'https://example.test'] });
+    assert.match(automatic.stderr, /API Key/);
+    assert(!`${automatic.stdout}${automatic.stderr}`.includes(key));
+    assert.equal(readCredentials(env)[provider], key);
+    const saved = run(['snapshot', '--json']);
+    assert.equal(saved.status, 0, saved.stderr);
+    assert.equal(saved.stderr, '');
+    rmSync(credentialsPath(env));
+  }
+  for (const options of [{ TEST_REJECT: '1' }, { TEST_CANCEL: '1' }]) {
+    const failed = run(['open', 'https://example.test', '--json'], { TEST_KEY: 'sh-test', ...options });
+    assert.equal(failed.status, 1);
+    assert.match(JSON.parse(failed.stdout).error.code, /MODEL_HTTP_401|AUTH_CANCELLED/);
+    assert.deepEqual(readCredentials(env), {});
+  }
+  for (const args of [['open', 'https://example.test'], ['snapshot'], ['act', 'read title'], ['auth', 'login']]) {
+    const failed = run([...args, '--json']);
+    assert.equal(failed.status, 1);
+    assert.equal(JSON.parse(failed.stdout).error.code, 'NEEDS_INPUT');
+  }
+  for (const args of [['help'], ['--help'], ['auth', 'login', '--help']]) {
+    const result = run(args);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /auth login/);
+    assert.match(result.stdout, /sh-/);
+    assert.equal(result.stderr, '');
+  }
+  const configured = run(['snapshot'], { TYPESAFE_API_KEY: 'env-test' });
+  assert.equal(configured.status, 0);
+  assert.equal(configured.stderr, '');
 });

@@ -42,7 +42,7 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 准备 OpenRouter 或 TypeSafe API Key。源码构建可登录后保存：
 
 ```bash
-jev-browser auth login openrouter  # 输入 Key，验证后保存；官方接口改用 typesafe
+jev-browser auth login             # 交互输入 Key，验证后自动识别提供方并保存
 jev-browser auth status            # 查看当前提供方
 jev-browser auth logout openrouter # 删除已保存的 Key
 ```
@@ -53,6 +53,8 @@ npm 0.1.1 或 CI 使用环境变量：
 export OPENROUTER_API_KEY="你的 OpenRouter Key"
 # 或：export TYPESAFE_API_KEY="你的 TypeSafe Key"
 ```
+
+未配置 Key 时，执行命令会自动进入交互登录，成功后继续原命令；帮助、版本和模型凭据管理无需登录。`sh-` 开头的 Key 自动保存为 OpenRouter，其余保存为 TypeSafe 官方；也可使用 `auth login openrouter` 或 `auth login typesafe` 显式指定。非交互环境先执行 `auth login --with-token`，从管道传入 Key。
 
 同一提供方优先使用环境变量；两个提供方都有 Key 时优先 TypeSafe。
 
@@ -102,7 +104,7 @@ jev-browser --session hotel act --op click '确认预订按钮' --dry-run --json
 printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill '密码输入框' --value-stdin
 ```
 
-已知选择器时，也可直接使用 `click '#submit'`、`fill '#name' '张三'` 等命令，无需模型 Key。更多参数见 `jev-browser --help` 和 `jev-browser help`。
+已知选择器时，也可直接使用 `click '#submit'`、`fill '#name' '张三'` 等命令，登录后执行时不调用模型。更多参数见 `jev-browser --help` 和 `jev-browser help`。
 
 ## 3. 实现原理简述
 
