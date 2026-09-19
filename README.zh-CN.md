@@ -137,7 +137,7 @@ node scripts/licenses.mjs
 npm pack
 ```
 
-生成的 `jev-browser-cli-0.1.2.tgz` 包含本机执行器。
+生成的 `jev-browser-cli-0.1.3.tgz` 包含本机执行器。
 
 构建并发布到 npm：
 
