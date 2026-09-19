@@ -65,6 +65,8 @@ printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill "密码�
 
 `act --op` 把文字当作目标描述；完整 `act` 先选择操作类型。填写值来自 `--value`、stdin 或用户指令中的引号片段。`select` 支持原生下拉框的值或可见标签；自定义下拉组件需要分步调用。`scroll` 首版每次滚动 500 px；`press` 支持帮助和源码动作表中的常用按键与组合键。
 
+原生日期输入框可以填写完整 ISO 日期，例如 `act --op fill "离店日期输入框" --value 2026-10-13`。非法日期格式会报错并保留原值；日期范围等业务规则仍由页面处理。
+
 ```bash
 jev-browser act '在“姓名”中填写“张三”'
 jev-browser act '向下滚动'
@@ -116,6 +118,8 @@ JEV_TEST_CDP=9222 npm run test:live
 ```
 
 真实测试使用 OpenRouter，覆盖 11 个固定中文页面场景及 CLI 标准输入填写，输出每步选择、概率、实际模型版本、用量与耗时到本机 `.cache/live-validation-*.json`。2026-09-19 已验证 latest 别名解析为 `typesafe/jev-1.13-20260917`，详细结果见 VALIDATION.md。
+
+另已通过 SuperHarness 执行普通页面和酒店预订模拟的 25 项 Playwright E2E：CLI 负责操作，Playwright 独立断言并记录视频和业务请求。任务位于 `.superharness/tasks/09-19-jev-usage-hotel/`；其 `e2e/` 脚本、冻结数据和报告保留在本机并按技能规则忽略，不随 npm 包分发。酒店数据为 synthetic，不涉及真实酒店订单或支付。
 
 ## 来源与许可证
 

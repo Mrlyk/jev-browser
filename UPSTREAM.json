@@ -4,5 +4,5 @@
   "commit": "aff6125c023b810ea3f2e5deec5379e9a4270bdc",
   "license": "Apache-2.0",
   "imported": ["cli", "skill-data", "LICENSE", "upstream/README.md"],
-  "patches": ["internal binary name and fork version", "isolated state and config names", "optional no-replay IPC", "snapshot page/frame/DOM identity and text refs", "upstream README test path"]
+  "patches": ["internal binary name and fork version", "isolated state and config names", "optional no-replay IPC", "snapshot page/frame/DOM identity and text refs", "native date/time input refs and value assignment", "upstream README test path"]
 }

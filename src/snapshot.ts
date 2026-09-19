@@ -34,10 +34,11 @@ export function snapshot(data: unknown): Snapshot {
 
 export function candidatesFor(observation: Snapshot, op: Operation): Candidate[] {
   const roles: Partial<Record<Operation, string[]>> = {
-    fill: ['textbox', 'searchbox', 'combobox', 'spinbutton'], type: ['textbox', 'searchbox', 'combobox', 'spinbutton'],
+    fill: ['textbox', 'searchbox', 'combobox', 'spinbutton', 'date', 'datetime'], type: ['textbox', 'searchbox', 'combobox', 'spinbutton'],
     check: ['checkbox', 'switch', 'menuitemcheckbox'], uncheck: ['checkbox', 'switch', 'menuitemcheckbox'], select: ['combobox', 'listbox'],
   };
   const candidates = observation.candidates.filter(c =>
+    !(op === 'fill' && c.role === 'spinbutton' && /\bDate(?:Time)? "/.test(c.context)) &&
     (op === 'get_text' || c.role.toLowerCase() !== 'statictext') &&
     (!roles[op] || roles[op]!.includes(c.role.toLowerCase())));
   if (candidates.length > 253) throw new JevError('TOO_MANY_CANDIDATES', '目标超过 253 个，请用 --scope 限定 CSS 范围。');

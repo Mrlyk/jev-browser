@@ -126,6 +126,46 @@ pub async fn hover(
     Ok((x + offset.0, y + offset.1))
 }
 
+// jev-browser: keyboard insertion does not set browser-native date/time fields.
+// Validate on a detached input before changing the target, then use the native
+// setter and dispatch the events expected by application form handlers.
+async fn fill_formatted_input(
+    client: &CdpClient,
+    target: (&str, &str),
+    value: &str,
+) -> Result<bool, String> {
+    let result = client.send_command_typed::<_, Value>(
+        "Runtime.callFunctionOn",
+        &CallFunctionOnParams {
+            function_declaration: r#"function(value) {
+                const types = ['date', 'datetime-local', 'time', 'month', 'week'];
+                if (this.tagName !== 'INPUT' || !types.includes(this.type)) return {handled: false};
+                if (this.disabled || this.readOnly) return {handled: true, error: 'Input is not editable'};
+                const probe = this.ownerDocument.createElement('input');
+                probe.type = this.type;
+                probe.value = value;
+                if (probe.value !== value) return {handled: true, error: 'Invalid ' + this.type + ' value'};
+                this.focus();
+                const setter = Object.getOwnPropertyDescriptor(this.ownerDocument.defaultView.HTMLInputElement.prototype, 'value').set;
+                setter.call(this, value);
+                this.dispatchEvent(new Event('input', {bubbles: true}));
+                this.dispatchEvent(new Event('change', {bubbles: true}));
+                return {handled: true};
+            }"#.to_string(),
+            object_id: Some(target.0.to_string()),
+            arguments: Some(vec![CallArgument {value: Some(serde_json::json!(value)), object_id: None}]),
+            return_by_value: Some(true),
+            await_promise: Some(false),
+        },
+        Some(target.1),
+    ).await?;
+    let data = &result["result"]["value"];
+    if let Some(error) = data["error"].as_str() {
+        return Err(error.to_string());
+    }
+    Ok(data["handled"].as_bool().unwrap_or(false))
+}
+
 pub async fn fill(
     client: &CdpClient,
     session_id: &str,
@@ -142,6 +182,10 @@ pub async fn fill(
         iframe_sessions,
     )
     .await?;
+
+    if fill_formatted_input(client, (&object_id, &effective_session_id), value).await? {
+        return Ok(());
+    }
 
     // Focus the element
     client

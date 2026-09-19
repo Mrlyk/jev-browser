@@ -107,6 +107,15 @@ test('解析带 checked、expanded 等状态的真实上游 ref 格式', () => {
   assert.equal(candidatesFor(parsed, 'check')[0].ref, 'e1');
 });
 
+test('日期填写选择整个原生控件，排除内部年月日片段', () => {
+  const d = data();
+  d.snapshot = '- Date "离店日期" [ref=e1]: 2026-10-12\n  - spinbutton "年" [ref=e2]: 2026\n- spinbutton "房间数量" [ref=e3]: 1';
+  d.refs.e1 = { role: 'Date', name: '离店日期', backendNodeId: 1 };
+  d.refs.e2 = { role: 'spinbutton', name: '年', backendNodeId: 2 };
+  d.refs.e3 = { role: 'spinbutton', name: '房间数量', backendNodeId: 3 };
+  assert.deepEqual(candidatesFor(snapshot(d), 'fill').map(c => c.ref), ['e1', 'e3']);
+});
+
 test('参数解析保留值、全局作用域，并防止把参数值 act 当命令', () => {
   const p = parseArgs(['--session', 'act', 'act', '--op', 'fill', '姓名', '--value', '--json', '--json']);
   assert.equal(p.session, 'act'); assert.equal(p.options.value, '--json'); assert.equal(p.json, true);

@@ -105,6 +105,9 @@ mod document_identity_regressions {
 }
 
 const INTERACTIVE_ROLES: &[&str] = &[
+    // jev-browser: native date fields must be addressable as whole inputs.
+    "Date",
+    "DateTime",
     "button",
     "link",
     "textbox",
