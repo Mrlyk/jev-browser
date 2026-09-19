@@ -5,6 +5,8 @@ import { Jev, modelConfig } from './jev.js';
 import { act } from './semantic.js';
 import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
+import { readCredentials } from './credentials.js';
+import { handleAuth } from './auth.js';
 
 const help = `jev-browser 0.1.1 — Jev 语义浏览器 CLI
 
@@ -17,13 +19,15 @@ const help = `jev-browser 0.1.1 — Jev 语义浏览器 CLI
   act --op fill "姓名" --value "张三"
   act --op fill "密码" --value-stdin
   act "点击确认" --dry-run --json
+  auth login typesafe|openrouter [--with-token]  验证 Jev 并保存 Key
+  auth status / auth logout <提供方>             查看来源 / 删除本地 Key
 
 act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
      --min-probability <0..1>（默认 0.85）、--min-margin <0..1>（默认 0.20）
 全局：--session <name>、--headed、--cdp <port|url>、--json
 原子命令详见：jev-browser help
 
-TYPESAFE_API_KEY 优先；仅配置 OPENROUTER_API_KEY 时使用 OpenRouter。
+同一提供方环境变量覆盖本地 Key；TypeSafe 官方优先，未配置时使用 OpenRouter。
 模型可用 TYPESAFE_MODEL / OPENROUTER_MODEL 固定；失败不切换通道。
 `;
 
@@ -46,12 +50,14 @@ async function main(): Promise<void> {
   }
   if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.1\n'); return; }
   const parsed = parseArgs(args);
+  if (parsed.name === 'auth' && await handleAuth(parsed.rest, parsed.json)) return;
+  if (parsed.name === 'help' && parsed.rest[0] === 'auth') { await handleAuth(['--help'], parsed.json); return; }
   if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser-cli 更新完整安装包。');
   if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', '首版尚未打包上游 Dashboard。');
   const browser = new Browser(parsed.globals);
   await withSession(parsed.session, async () => {
     if (parsed.name === 'act') {
-      const jev = new Jev(modelConfig());
+      const jev = new Jev(modelConfig(process.env, readCredentials()));
       if (parsed.options.valueStdin) parsed.options.value = await stdinValue();
       const startupMs = Math.round(performance.now());
       const result = await act(parsed.options, browser, jev);

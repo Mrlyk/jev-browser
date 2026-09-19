@@ -2,6 +2,23 @@
 
 Use for browser ownership, CDP, saved login state, and credential input. Adapted from upstream session, authentication, proxy, and trust-boundary guidance; names and paths below follow jev-browser.
 
+## Model API keys
+
+Current source builds add local model credentials; npm 0.1.1 uses environment variables only.
+
+```bash
+jev-browser auth login openrouter  # Or typesafe; hidden input in a human terminal
+printf '%s' "$OPENROUTER_API_KEY" | jev-browser auth login openrouter --with-token
+jev-browser auth status --json
+jev-browser auth logout openrouter
+```
+
+Use one input method. `login` validates the submitted Key with one small, fixed-text Jev decision request before saving; it opens no browser, incurs a small API charge, and preserves the old Key on failure. Use stdin for an authorized automated setup; keep the Key out of arguments, logs, and prompts. Do not use a model-selected Key or silently change provider after a failed check.
+
+The plaintext file is `$XDG_CONFIG_HOME/jev-browser/credentials.json`, defaulting to `~/.config/jev-browser/credentials.json`. macOS/Linux permissions are `0700` for its directory and `0600` for the file. Each provider's non-empty environment variable overrides its stored Key; TypeSafe then wins across sources. `auth status` reports the selected provider and sources without exposing keys or making an API call. `logout` removes only the stored Key; an environment Key can remain active.
+
+`auth login typesafe` and `auth login openrouter` are reserved for model keys. Other profile names keep the upstream website login behavior.
+
 ## Task ownership
 
 Choose a unique session name for each independent task. Keep a sequential workflow in that session; use a different session for an unrelated task. An explicit name contains 1–48 letters, digits, underscores, or hyphens.

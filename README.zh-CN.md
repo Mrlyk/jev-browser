@@ -39,14 +39,34 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 
 ### 配置模型
 
-准备一个 OpenRouter 或 TypeSafe API Key，任选一种配置：
+准备一个 OpenRouter 或 TypeSafe API Key。当前源码构建支持本地保存（npm 0.1.1 仅支持环境变量）：
+
+```bash
+jev-browser auth login openrouter  # 隐藏输入 Key；官方接口改用 typesafe
+jev-browser auth status            # 查看当前提供方和凭据来源
+jev-browser auth logout openrouter
+```
+
+`login` 使用本次输入的 Key 和对应提供方的模型，发送一次小型 Jev 判断请求，检查成功后才保存。请求仅包含固定文本，不打开浏览器，会产生少量 API 费用；失败时保留原 Key。`status` 仅查看本地配置，不调用模型。
+
+Key 以明文存放在项目外的 `~/.config/jev-browser/credentials.json`；配置了 `XDG_CONFIG_HOME` 时使用其下的 `jev-browser/credentials.json`。macOS/Linux 目录权限为 `0700`、文件权限为 `0600`，通过权限限制访问，未加密。`logout` 只删除已保存的 Key，不修改环境变量。
+
+CI 或临时使用仍可配置环境变量：
 
 ```bash
 export OPENROUTER_API_KEY="你的 OpenRouter Key"
 # 使用官方接口时改为：export TYPESAFE_API_KEY="你的 TypeSafe Key"
 ```
 
-两个 Key 都配置时优先使用 TypeSafe 官方接口；请求失败不会自动切换通道。
+同一提供方的非空环境变量覆盖本地 Key；解析两个提供方后仍优先使用 TypeSafe。即使 TypeSafe Key 来自本地、OpenRouter Key 来自环境变量，也会选择 TypeSafe。请求失败不会自动切换通道，不会自动加载 `.env` 文件。
+
+自动化保存 Key 时，从标准输入传入：
+
+```bash
+printf '%s' "$OPENROUTER_API_KEY" | jev-browser auth login openrouter --with-token
+```
+
+`auth login typesafe` 和 `auth login openrouter` 管理模型 Key；`auth login <其他名称>` 保留网站账号登录功能。
 
 ### 与其他模型或 Agent 配合
 

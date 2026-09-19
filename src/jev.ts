@@ -1,20 +1,23 @@
 import { JevError, object } from './errors.js';
+import { type Credentials } from './credentials.js';
 
 export type Question = { type: 'choice'; instructions: string; criteria: Record<string, string> };
 export type Answer = { type: 'choice'; choice: string; probabilities: Record<string, number>; confidence: number };
 export type Evaluation = { model: string; answers: Record<string, Answer>; usage?: unknown; id?: string };
 export type ModelConfig = { transport: 'typesafe' | 'openrouter'; endpoint: string; model: string; key: string };
 
-export function modelConfig(env = process.env): ModelConfig {
-  if (env.TYPESAFE_API_KEY?.trim()) return {
+export function modelConfig(env = process.env, stored: Credentials = {}): ModelConfig {
+  const typesafe = env.TYPESAFE_API_KEY?.trim() || stored.typesafe;
+  const openrouter = env.OPENROUTER_API_KEY?.trim() || stored.openrouter;
+  if (typesafe) return {
     transport: 'typesafe', endpoint: 'https://api.typesafe.ai/v1/systemone',
-    model: env.TYPESAFE_MODEL?.trim() || 'jev-latest', key: env.TYPESAFE_API_KEY.trim(),
+    model: env.TYPESAFE_MODEL?.trim() || 'jev-latest', key: typesafe,
   };
-  if (env.OPENROUTER_API_KEY?.trim()) return {
+  if (openrouter) return {
     transport: 'openrouter', endpoint: 'https://openrouter.ai/api/alpha/decisions',
-    model: env.OPENROUTER_MODEL?.trim() || '~typesafe/jev-latest', key: env.OPENROUTER_API_KEY.trim(),
+    model: env.OPENROUTER_MODEL?.trim() || '~typesafe/jev-latest', key: openrouter,
   };
-  throw new JevError('MISSING_API_KEY', 'act 需要 TYPESAFE_API_KEY 或 OPENROUTER_API_KEY。');
+  throw new JevError('MISSING_API_KEY', '请运行 auth login typesafe/openrouter，或设置 TYPESAFE_API_KEY / OPENROUTER_API_KEY。');
 }
 
 export function choice(instructions: string, criteria: Record<string, string>): Question {

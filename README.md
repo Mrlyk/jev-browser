@@ -39,14 +39,34 @@ and use it for browser tasks in this project.
 
 ### Configure a model
 
-Choose either an OpenRouter or a TypeSafe API key:
+Use either an OpenRouter or TypeSafe API key. Current source builds support saving it locally (npm 0.1.1 supports environment variables only):
+
+```bash
+jev-browser auth login openrouter  # Hidden Key input; use typesafe for the direct API
+jev-browser auth status            # Show active provider and credential source
+jev-browser auth logout openrouter
+```
+
+`login` sends one small Jev decision request using the submitted Key and the selected provider's model, then saves it only if the check succeeds. The check uses fixed text, opens no browser, and incurs a small API charge. A failed check keeps the previous Key. `status` reads local configuration without calling the model.
+
+Keys are stored as plaintext in `~/.config/jev-browser/credentials.json` (`$XDG_CONFIG_HOME/jev-browser/credentials.json` when configured), outside the project. On macOS/Linux the directory is `0700` and the file is `0600`; this restricts access without encrypting the Key. `logout` removes the saved Key, leaving environment variables unchanged.
+
+For CI or temporary use, set environment variables:
 
 ```bash
 export OPENROUTER_API_KEY="your OpenRouter key"
 # For the direct API instead: export TYPESAFE_API_KEY="your TypeSafe key"
 ```
 
-When both keys are set, TypeSafe takes priority. Failed requests do not switch providers automatically.
+For each provider, a non-empty environment variable overrides its saved Key. After resolving both providers, TypeSafe takes priority—even when its Key is stored and OpenRouter's is in the environment. Failed requests do not switch providers automatically. `.env` files are not loaded automatically.
+
+To save a Key through automation, pass it via stdin:
+
+```bash
+printf '%s' "$OPENROUTER_API_KEY" | jev-browser auth login openrouter --with-token
+```
+
+`auth login typesafe` and `auth login openrouter` manage model Keys; `auth login <other-name>` retains the website login behavior.
 
 ### Pair with another model or agent
 

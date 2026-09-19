@@ -26,6 +26,13 @@
 
 复现命令见 README.md。运行输出保存在本机被忽略的 .cache/ts-test.log、.cache/rust-test.log、.cache/rust-snapshot-test.log、.cache/rust-flags-test.log 和 .cache/browser-smoke.log。
 
+## 本地模型凭据验证（0.1.1 发布后的源码）
+
+- 自动化测试 34/34 通过，包含两个提供方的最小检查请求、失败保留旧 Key、环境变量覆盖与官方优先、文件权限、损坏文件与符号链接拒绝、stdin 登录及网站认证路由兼容。HTTP 错误、超时和异常响应使用受控数据验证。
+- 使用已有授权的 OpenRouter Key 实际执行 `auth login openrouter --with-token`，向 `~typesafe/jev-latest` 发送一次固定文本、单个 choice 问题，请求及校验耗时 1,499 ms。成功保存后核验 status 和 logout；临时测试凭据已删除，报告未记录 Key。
+- PTY 验证隐藏输入、退格和 Ctrl-C：Key 未回显，取消时保留原凭据。Skill 主文件与四份参考文档加载检查通过。
+- TypeSafe 官方通道通过受控请求测试，本次没有官方真实 Key 联调；本次改动未重新执行浏览器 E2E，也未发布新 npm 版本。
+
 ## OpenRouter 真实验证
 
 首轮 10/11 通过。读取“操作结果区域”时，模型在状态容器与其中的文本节点之间返回 ambiguous，工具停止且未派发动作。补充 get_text 的容器与文本节点选择规则后，同一组场景 11/11 通过；目标概率 0.91，继续使用原来的 0.85 概率和 0.20 差值阈值。

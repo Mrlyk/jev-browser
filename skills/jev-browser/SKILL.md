@@ -11,7 +11,7 @@ Use this CLI as the browser execution tool for the user's task. You plan the wor
 
 - Install **`jev-browser-cli`** from npm; invoke **`jev-browser`**. The npm package named `jev-browser` is a different project. Check `jev-browser --version` and `jev-browser --help`.
 - Node.js 22+ is required. The published binary targets macOS Apple Silicon; other platforms require a source build. The browser executor is bundled.
-- `act` reads `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` from the invoking process. TypeSafe wins when both are set. Do not expose keys or change providers to bypass an error. Atomic commands need no model key.
+- `act` resolves each provider from environment variables first, then saved credentials; TypeSafe wins across providers. For local Key setup and verification, read [sessions-auth.md](references/sessions-auth.md). Do not expose keys or change providers to bypass an error. Atomic commands need no model key.
 
 ## Operate one step at a time
 
