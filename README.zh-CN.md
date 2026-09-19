@@ -39,10 +39,10 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 
 ### 配置模型
 
-准备 OpenRouter 或 TypeSafe API Key。0.1.2 及更新版本可登录验证后保存：
+准备 OpenRouter 或 TypeSafe API Key，登录一次即可：
 
 ```bash
-jev-browser auth login             # 交互输入 Key，验证后自动识别提供方并保存
+jev-browser auth login             # 输入 Key 登录
 jev-browser auth status            # 查看当前提供方
 jev-browser auth logout openrouter # 删除已保存的 Key
 ```
@@ -54,7 +54,7 @@ export OPENROUTER_API_KEY="你的 OpenRouter Key"
 # 或：export TYPESAFE_API_KEY="你的 TypeSafe Key"
 ```
 
-未配置 Key 时，执行命令会自动进入交互登录，成功后继续原命令；帮助、版本和模型凭据管理无需登录。`sh-` 开头的 Key 自动保存为 OpenRouter，其余保存为 TypeSafe 官方；也可使用 `auth login openrouter` 或 `auth login typesafe` 显式指定。非交互环境先执行 `auth login --with-token`，从管道传入 Key。
+首次使用时会提示登录，成功后继续原命令。非交互环境可通过 `auth login --with-token` 从标准输入登录。
 
 同一提供方优先使用环境变量；两个提供方都有 Key 时优先 TypeSafe。
 

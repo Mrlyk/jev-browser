@@ -7,15 +7,15 @@ Use for browser ownership, CDP, saved login state, and credential input. Adapted
 Version 0.1.2 and later support local model credentials and automatic login.
 
 ```bash
-jev-browser auth login  # Hidden input; sh- uses OpenRouter, other keys use TypeSafe
+jev-browser auth login  # Enter your Key to sign in
 printf '%s' "$OPENROUTER_API_KEY" | jev-browser auth login openrouter --with-token
 jev-browser auth status --json
 jev-browser auth logout openrouter
 ```
 
-Commands without a configured Key prompt for login and resume after success. Help, version and model credential management do not require login. Explicit provider names override prefix detection. Non-interactive commands never consume their stdin as a Key; configure credentials first.
+Commands without a configured Key prompt for login and resume after success. Help, version and model credential management do not require login. Non-interactive commands never consume their stdin as a Key; configure credentials first.
 
-Use one input method. `login` validates the submitted Key with one small, fixed-text Jev decision request before saving; it opens no browser, incurs a small API charge, and preserves the old Key on failure. Use stdin for an authorized automated setup; keep the Key out of arguments, logs, and prompts. Do not use a model-selected Key or silently change provider after a failed check.
+Use stdin for an authorized automated setup; keep the Key out of arguments, logs, and prompts. Failed login preserves the previous Key.
 
 The plaintext file is `$XDG_CONFIG_HOME/jev-browser/credentials.json`, defaulting to `~/.config/jev-browser/credentials.json`. macOS/Linux permissions are `0700` for its directory and `0600` for the file. Each provider's non-empty environment variable overrides its stored Key; TypeSafe then wins across sources. `auth status` reports the selected provider and sources without exposing keys or making an API call. `logout` removes only the stored Key; an environment Key can remain active.
 

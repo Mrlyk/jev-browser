@@ -3,23 +3,19 @@ import { credentialStatus, keyNames, providers, readCredentials, saveCredential,
 import { JevError } from './errors.js';
 import { readToken } from './token-input.js';
 
-const help = `模型凭据：
-  jev-browser auth login [typesafe|openrouter] [--with-token]
-  jev-browser auth status [--json]
-  jev-browser auth logout typesafe|openrouter
-login 通过隐藏输入或 stdin 接收 Key，发送一次最小 Jev 请求，成功后保存。
-省略提供方时，sh- 开头的 Key 使用 OpenRouter，其余使用 TypeSafe 官方。
-同一提供方的环境变量覆盖本地 Key；两个提供方均可用时优先 TypeSafe。
-logout 仅删除本地 Key；status 显示配置来源，不请求模型或显示 Key。
-网站账号命令 auth save/list/show/delete 和 auth login <其他名称> 保持原有用途。
+const help = `账号：
+  jev-browser auth login                         登录
+  jev-browser auth login [typesafe|openrouter] --with-token  从标准输入登录
+  jev-browser auth status [--json]                查看登录状态
+  jev-browser auth logout typesafe|openrouter      删除本地 Key
 `;
 
 export async function ensureLogin(): Promise<void> {
   if (credentialStatus().selected) return;
-  process.stderr.write('尚未登录，请输入模型 API Key（sh- 开头使用 OpenRouter，其余使用 TypeSafe 官方）。\n');
+  process.stderr.write('请先登录。\n');
   const key = await readToken(false);
-  const result = await login(key.startsWith('sh-') ? 'openrouter' : 'typesafe', key);
-  process.stderr.write(`Jev 检查通过，已保存 ${result.provider} Key。\n`);
+  await login(key.startsWith('sk') ? 'openrouter' : 'typesafe', key);
+  process.stderr.write('登录成功。\n');
 }
 
 export async function login(provider: Provider, key: string, options: { env?: NodeJS.ProcessEnv; request?: typeof fetch } = {}) {
@@ -34,7 +30,7 @@ export async function login(provider: Provider, key: string, options: { env?: No
     check: choice('Is the state ready?', { yes: 'Ready', no: 'Not ready' }),
   });
   if (result.answers.check.choice !== 'yes')
-    throw new JevError('MODEL_CHECK_FAILED', 'Jev 未通过最小判断检查，未保存 Key。');
+    throw new JevError('MODEL_CHECK_FAILED', '登录失败，请稍后重试。');
   const durationMs = Math.round(performance.now() - start);
   await saveCredential(provider, key, env);
   return { provider, model: config.model, verified: true, durationMs, ...credentialStatus(env) };
@@ -63,13 +59,13 @@ export async function handleAuth(args: string[], json = false): Promise<boolean>
   let data;
   if (command === 'login') {
     const key = await readToken(flags.includes('--with-token'));
-    data = await login((provider as Provider | undefined) ?? (key.startsWith('sh-') ? 'openrouter' : 'typesafe'), key);
+    data = await login((provider as Provider | undefined) ?? (key.startsWith('sk') ? 'openrouter' : 'typesafe'), key);
   } else if (command === 'logout') {
     await saveCredential(provider as Provider, undefined);
     data = { removed: provider, ...credentialStatus() };
   } else data = credentialStatus();
-  process.stdout.write(json ? JSON.stringify({ success: true, data }) + '\n' :
-    `${command === 'login' ? 'Jev 检查通过，已保存 Key。\n' : command === 'logout' ? '已删除本地 Key；环境变量仍可生效。\n' : ''}` +
+  process.stdout.write(json ? JSON.stringify({ success: true, data }) + '\n' : command === 'login' ? '登录成功。\n' :
+    `${command === 'logout' ? '已删除本地 Key；环境变量仍可生效。\n' : ''}` +
     `当前提供方：${data.selected ?? '未配置'}\n` +
     data.providers.map(item => `${item.provider}: ${item.source}（本地${item.stored ? '已保存' : '未保存'}）`).join('\n') + '\n');
   return true;

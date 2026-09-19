@@ -149,7 +149,7 @@ test('CLI stdin login, JSON status and logout work without browser/key echo', t 
   const logout = run(['auth', 'logout', 'openrouter', '--json']);
   assert.equal(JSON.parse(logout.stdout).data.selected, null);
   assert.deepEqual(readCredentials(env), {});
-  for (const [key, provider] of [['sh-piped', 'openrouter'], ['official-piped', 'typesafe']]) {
+  for (const [key, provider] of [['sk-piped', 'openrouter'], ['skplain', 'openrouter'], ['sh-piped', 'typesafe'], ['official-piped', 'typesafe']]) {
     const inferred = run(['auth', 'login', '--with-token', '--json'], key + '\n');
     assert.equal(inferred.status, 0, inferred.stderr);
     assert.equal(JSON.parse(inferred.stdout).data.provider, provider);
@@ -164,7 +164,7 @@ test('CLI detects providers, prompts before execution, resumes once and preserve
     import { Browser } from ${JSON.stringify(new URL('../dist/browser.js', import.meta.url).href)};
     globalThis.fetch = async (url, init) => {
       const key = init.headers.Authorization.slice(7);
-      const provider = key.startsWith('sh-') ? 'openrouter' : 'typesafe';
+      const provider = key.startsWith('sk') ? 'openrouter' : 'typesafe';
       if (!url.includes(provider === 'openrouter' ? 'openrouter.ai' : 'typesafe.ai')) throw Error('wrong provider');
       return process.env.TEST_REJECT ? new Response('', { status: 401 }) : Response.json(${JSON.stringify(response())});
     };
@@ -187,16 +187,20 @@ test('CLI detects providers, prompts before execution, resumes once and preserve
     NODE_OPTIONS: '', JEV_BROWSER_RUNTIME_DIR: join(root, 'runtime') };
   const run = (args, options = {}) => spawnSync(process.execPath, ['--import', hook, 'dist/cli.js', ...args],
     { env: { ...childEnv, ...options }, encoding: 'utf8', timeout: 10000 });
-  for (const [key, provider] of [['sh-router-test', 'openrouter'], ['official-test', 'typesafe']]) {
+  for (const [key, provider] of [['sk-router-test', 'openrouter'], ['skplain', 'openrouter'], ['sh-test', 'typesafe'], ['official-test', 'typesafe']]) {
     const explicit = run(['auth', 'login', '--json'], { TEST_KEY: key });
     assert.equal(explicit.status, 0, explicit.stderr);
     assert.equal(JSON.parse(explicit.stdout).data.provider, provider);
     assert.equal(readCredentials(env)[provider], key);
+    const plain = run(['auth', 'login'], { TEST_KEY: key });
+    assert.equal(plain.status, 0, plain.stderr);
+    assert.equal(plain.stdout, '登录成功。\n');
+    assert.equal(plain.stderr, 'API Key（输入隐藏）：\n');
     rmSync(credentialsPath(env));
     const automatic = run(['--json', 'open', 'https://example.test'], { TEST_KEY: key });
     assert.equal(automatic.status, 0, automatic.stderr);
     assert.deepEqual(JSON.parse(automatic.stdout), { executed: ['open', 'https://example.test'] });
-    assert.match(automatic.stderr, /API Key/);
+    assert.equal(automatic.stderr, '请先登录。\nAPI Key（输入隐藏）：\n登录成功。\n');
     assert(!`${automatic.stdout}${automatic.stderr}`.includes(key));
     assert.equal(readCredentials(env)[provider], key);
     const saved = run(['snapshot', '--json']);
@@ -205,7 +209,7 @@ test('CLI detects providers, prompts before execution, resumes once and preserve
     rmSync(credentialsPath(env));
   }
   for (const options of [{ TEST_REJECT: '1' }, { TEST_CANCEL: '1' }]) {
-    const failed = run(['open', 'https://example.test', '--json'], { TEST_KEY: 'sh-test', ...options });
+    const failed = run(['open', 'https://example.test', '--json'], { TEST_KEY: 'sk-test', ...options });
     assert.equal(failed.status, 1);
     assert.match(JSON.parse(failed.stdout).error.code, /MODEL_HTTP_401|AUTH_CANCELLED/);
     assert.deepEqual(readCredentials(env), {});
@@ -219,7 +223,7 @@ test('CLI detects providers, prompts before execution, resumes once and preserve
     const result = run(args);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /auth login/);
-    assert.match(result.stdout, /sh-/);
+    assert.doesNotMatch(result.stdout, /sh-|sk-|自动识别|最小|检查通过|验证/);
     assert.equal(result.stderr, '');
   }
   const configured = run(['snapshot'], { TYPESAFE_API_KEY: 'env-test' });

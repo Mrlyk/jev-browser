@@ -25,7 +25,7 @@ function hiddenToken(): Promise<string> {
   const wasRaw = input.isRaw;
   emitKeypressEvents(input);
   input.setRawMode(true);
-  process.stderr.write('API Key（输入隐藏；将发送一次最小 Jev 请求验证）：');
+  process.stderr.write('API Key（输入隐藏）：');
   return new Promise((resolve, reject) => {
     let value = '';
     const finish = (error?: Error) => {

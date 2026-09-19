@@ -19,8 +19,8 @@ const help = `jev-browser 0.1.2 — Jev 语义浏览器 CLI
   act --op fill "姓名" --value "张三"
   act --op fill "密码" --value-stdin
   act "点击确认" --dry-run --json
-  auth login                交互输入 Key，自动识别提供方并保存
-  auth login [typesafe|openrouter] [--with-token]  指定提供方或从管道登录
+  auth login                登录
+  auth login --with-token    从标准输入登录
   auth status / auth logout <提供方>             查看来源 / 删除本地 Key
 
 act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
@@ -28,10 +28,7 @@ act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
 全局：--session <name>、--headed、--cdp <port|url>、--json
 原子命令详见：jev-browser help
 
-同一提供方环境变量覆盖本地 Key；TypeSafe 官方优先，未配置时使用 OpenRouter。
-模型可用 TYPESAFE_MODEL / OPENROUTER_MODEL 固定；失败不切换通道。
-未配置 Key 时，执行命令前自动登录；帮助、版本和模型凭据管理无需登录。
-自动识别：sh- 开头使用 OpenRouter，其余使用 TypeSafe 官方。
+首次使用时会提示登录。
 `;
 
 async function stdinValue(): Promise<string> {

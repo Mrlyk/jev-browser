@@ -39,10 +39,10 @@ and use it for browser tasks in this project.
 
 ### Configure a model
 
-Use an OpenRouter or TypeSafe API key. Version 0.1.2 and later can verify and save it locally:
+Sign in once with an OpenRouter or TypeSafe API key:
 
 ```bash
-jev-browser auth login             # Enter a Key to detect its provider, verify and save
+jev-browser auth login             # Enter your Key to sign in
 jev-browser auth status            # Check the active provider
 jev-browser auth logout openrouter # Remove the saved Key
 ```
@@ -54,7 +54,7 @@ export OPENROUTER_API_KEY="your OpenRouter key"
 # Or: export TYPESAFE_API_KEY="your TypeSafe key"
 ```
 
-Commands automatically prompt for login when no Key is configured, then continue after successful login. Help, version and model credential management remain available without login. Keys starting with `sh-` are saved for OpenRouter; all others use TypeSafe. An explicit `auth login openrouter` or `auth login typesafe` overrides detection. For non-interactive setup, pipe the Key to `auth login --with-token`.
+On first use, the CLI prompts you to sign in, then continues your command. For non-interactive setup, pipe the Key to `auth login --with-token`.
 
 Environment variables override saved Keys for the same provider. When both providers have a Key, TypeSafe takes priority.
 
