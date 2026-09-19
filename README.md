@@ -1,10 +1,10 @@
 # jev-browser
 
-Control the browser in natural language with Jev's millisecond decisions and near-zero inference costs.
+A browser automation CLI for AI agents, powered by the Jev model's millisecond decisions and near-zero inference costs.
 
 English | [简体中文](README.zh-CN.md)
 
-- **Millisecond decisions.** Jev selects structured answers quickly. OpenRouter reports a model-service P50 of approximately **250 ms** for Jev 1.13.
+- **Millisecond decisions.** Jev is a structured decision model built for fast judgments. OpenRouter reports a model-service P50 of approximately **250 ms** for Jev 1.13.
 - **Near-zero inference cost.** Input costs **$0.042 per million tokens**, with free output. One project validation run made 32 real API requests for approximately **$0.000852** in total.
 - **Fewer round trips.** Independent target and value questions within one operation share a single model request.
 
@@ -35,6 +35,12 @@ export OPENROUTER_API_KEY="your OpenRouter key"
 ```
 
 When both keys are set, TypeSafe takes priority. Failed requests do not switch providers automatically.
+
+### Pair with another model or agent
+
+Give the calling model access to a terminal tool and the [jev-browser skill](skills/jev-browser/SKILL.md). It plans the workflow and checks results; the CLI uses Jev to select a target and execute one action at a time.
+
+The companion skill lives in `skills/jev-browser/`. Load that folder with a skill-compatible agent, or have the model read `SKILL.md` before invoking the CLI.
 
 ### Operate in natural language
 
@@ -79,7 +85,7 @@ When you know the selector, use commands such as `click '#submit'` or `fill '#na
 ## 3. How it works
 
 - **TypeScript CLI:** parses the instruction, builds target candidates from the page snapshot, and validates model answers.
-- **Jev:** chooses from supplied options. It does not generate browser scripts; input values come from the user's original text or explicit parameters.
+- **Jev model:** selects from supplied options and returns probabilities. Input values come from the user's original text or explicit parameters; the CLI maps the choice to a browser command.
 - **Bundled Rust executor:** uses forked agent-browser source to connect to the browser, perform atomic actions, and retain sessions.
 
 Ambiguous or stale targets stop execution. An action with an unknown outcome is never automatically replayed.

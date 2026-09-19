@@ -1,7 +1,7 @@
 {
   "name": "jev-browser-cli",
   "version": "0.1.0",
-  "description": "Natural-language browser automation powered by Jev's millisecond decisions",
+  "description": "Browser automation CLI for AI agents, powered by the Jev model's millisecond decisions and near-zero inference costs",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
@@ -14,6 +14,7 @@
     "dist",
     "libexec",
     "skill-data",
+    "skills",
     "third-party",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
