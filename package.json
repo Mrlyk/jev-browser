@@ -1,12 +1,26 @@
 {
-  "name": "jev-browser",
+  "name": "jev-browser-cli",
   "version": "0.1.0",
-  "description": "Jev semantic browser CLI with an embedded Rust browser executor",
+  "description": "Natural-language browser automation powered by Jev's millisecond decisions",
   "type": "module",
   "license": "Apache-2.0",
-  "bin": { "jev-browser": "dist/cli.js" },
-  "engines": { "node": ">=22.0.0" },
-  "files": ["dist", "libexec", "skill-data", "third-party", "LICENSE", "THIRD_PARTY_NOTICES.md", "UPSTREAM.json"],
+  "bin": {
+    "jev-browser": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "dist",
+    "libexec",
+    "skill-data",
+    "third-party",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "UPSTREAM.json",
+    "README.zh-CN.md",
+    "VALIDATION.md"
+  ],
   "scripts": {
     "build": "tsc && node scripts/finish-build.mjs",
     "build:core": "node scripts/build-core.mjs",
@@ -15,7 +29,23 @@
     "test:smoke": "npm run build && node test/smoke.mjs",
     "test:live": "npm run build && node test/live.mjs",
     "check": "tsc --noEmit",
+    "publish": "node scripts/publish.mjs",
     "prepack": "npm run build && node scripts/check-package.mjs"
   },
-  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.0" }
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mrlyk/jev-browser.git"
+  },
+  "homepage": "https://github.com/Mrlyk/jev-browser#readme",
+  "bugs": {
+    "url": "https://github.com/Mrlyk/jev-browser/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  }
 }

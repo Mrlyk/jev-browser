@@ -1,88 +1,96 @@
 # jev-browser
 
-用自然语言操作浏览器的命令行工具，支持点击、填写、选择和页面内容读取。
+Control the browser in natural language with Jev's millisecond decisions and near-zero inference costs.
 
-适用场景：
+English | [简体中文](README.zh-CN.md)
 
-- 让 AI Agent 按页面含义查找并操作控件。
-- 编写信息查询、表单填写、酒店预订等浏览器自动化脚本。
-- 在 E2E 测试中用语言描述操作，用独立断言验证结果。
+- **Millisecond decisions.** Jev selects structured answers quickly. OpenRouter reports a model-service P50 of approximately **250 ms** for Jev 1.13.
+- **Near-zero inference cost.** Input costs **$0.042 per million tokens**, with free output. One project validation run made 32 real API requests for approximately **$0.000852** in total.
+- **Fewer round trips.** Independent target and value questions within one operation share a single model request.
 
-## 1. 安装
+Model metrics and pricing: [OpenRouter](https://openrouter.ai/typesafe/jev-1.13), checked September 19, 2026. A complete browser operation also includes network, snapshot, and execution time. See [validation results](VALIDATION.md).
 
-需要 Node.js 22 或更新版本。当前尚未发布到 npm，使用与你的平台匹配的 `.tgz` 安装包；没有安装包时，按[开发说明](#4-开发说明)从源码构建。
+## 1. Installation
+
+Requires Node.js 22 or later. The current prebuilt package targets macOS Apple Silicon. See [Development](#4-development) to build for other platforms.
+
+Install the npm package `jev-browser-cli`; its command is `jev-browser`:
 
 ```bash
-npm install -g ./jev-browser-0.1.0.tgz
+npm install -g jev-browser-cli
 jev-browser --version
 ```
 
-安装包自带浏览器执行器，无需单独安装 agent-browser 或 Rust。首次打开页面时会查找 Chrome，缺少时自动下载。Linux 需要浏览器系统依赖；Linux ARM64 请先安装 Chromium，并通过 `--executable-path` 指定路径。
+The package includes its browser executor; users do not need agent-browser or Rust. On the first `open`, it finds Chrome or downloads it. Linux needs browser system libraries. On Linux ARM64, install Chromium and pass `--executable-path`.
 
-## 2. 使用
+## 2. Usage
 
-### 配置模型
+### Configure a model
 
-准备一个 OpenRouter 或 TypeSafe API Key，任选一种配置：
+Choose either an OpenRouter or a TypeSafe API key:
 
 ```bash
-export OPENROUTER_API_KEY="你的 OpenRouter Key"
-# 使用官方接口时改为：export TYPESAFE_API_KEY="你的 TypeSafe Key"
+export OPENROUTER_API_KEY="your OpenRouter key"
+# For the direct API instead: export TYPESAFE_API_KEY="your TypeSafe key"
 ```
 
-两个 Key 都配置时优先使用 TypeSafe 官方接口；请求失败不会自动切换通道。
+When both keys are set, TypeSafe takes priority. Failed requests do not switch providers automatically.
 
-### 直接用语言操作
+### Operate in natural language
 
-打开浏览器后，使用 `act` 描述要执行的动作：
+Open a browser, then describe each action with `act`:
 
 ```bash
 jev-browser --session demo --headed open https://example.com
-jev-browser --session demo act '读取 Example Domain 标题'
-jev-browser --session demo act '点击 Learn more 链接'
-jev-browser --session demo act '返回上一页'
+jev-browser --session demo act 'Read the Example Domain heading'
+jev-browser --session demo act 'Click the Learn more link'
+jev-browser --session demo act 'Go back to the previous page'
 jev-browser --session demo close
 ```
 
-`--headed` 显示浏览器窗口；使用相同的 `--session` 名称可连续操作同一个浏览器。
+`--headed` shows the browser window. Reuse the same `--session` name to keep working in the same browser.
 
-操作自己的业务页面时，先用 `open` 打开地址，再描述页面中的实际控件。以下是独立操作示例：
-
-```bash
-jev-browser --session hotel act '在“酒店关键词”输入框填写“花园”'
-jev-browser --session hotel act '点击搜索酒店按钮'
-jev-browser --session hotel act '点击标准大床房区域的预订按钮'
-jev-browser --session hotel act '勾选同意预订须知'
-```
-
-一次 `act` 执行一个动作，多步流程按顺序调用。填写内容用引号标明；同名控件加上所在区域。返回 `executed` 表示动作完成，业务是否成功仍需检查页面或接口结果。
-
-### 常用控制
+For your own site, open its URL first and use the actual control names. These are independent examples for pages containing the named controls:
 
 ```bash
-# 已知动作类型时，只让模型选择目标
-jev-browser --session hotel act --op fill '入住人姓名输入框' --value '张三'
-
-# 预览选择，不执行动作；用 JSON 输出结果
-jev-browser --session hotel act --op click '确认预订按钮' --dry-run --json
-
-# 敏感值从标准输入读取
-printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill '密码输入框' --value-stdin
+jev-browser --session hotel act 'Fill the "Hotel keyword" field with "Garden"'
+jev-browser --session hotel act 'Click the Search hotels button'
+jev-browser --session hotel act 'Click Book in the Standard King Room section'
+jev-browser --session hotel act 'Check the I agree to the booking terms checkbox'
 ```
 
-已知选择器时，也可直接使用 `click '#submit'`、`fill '#name' '张三'` 等命令，无需模型 Key。更多参数见 `jev-browser --help` 和 `jev-browser help`。
+Each `act` performs one action. Call it sequentially for a longer workflow. Quote values to enter and name the section when controls share a label. `executed` means the action completed; verify business outcomes with page or API assertions.
 
-## 3. 实现原理简述
+### Useful controls
 
-- **TypeScript CLI**：解析指令，从页面快照中整理目标候选，并检查模型返回的结果。
-- **Jev**：从给定候选中选择，不生成浏览器脚本；填写值取自用户原文或显式参数。
-- **内置 Rust 执行器**：复用 agent-browser 源码连接浏览器，执行点击、填写等操作，并保持会话。
+```bash
+# Specify the action; let the model select its target
+jev-browser --session hotel act --op fill 'Guest name field' --value 'Alex'
 
-目标不明确或页面已变化时，工具停止执行；动作派发后结果未知时，不自动重放。
+# Preview the target without acting, and return JSON
+jev-browser --session hotel act --op click 'Confirm booking button' --dry-run --json
 
-## 4. 开发说明
+# Pass a sensitive value through stdin
+printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill 'Password field' --value-stdin
+```
 
-源码开发需要 Node.js 22+ 和 Rust stable。在仓库根目录运行：
+When you know the selector, use commands such as `click '#submit'` or `fill '#name' 'Alex'` directly. These do not need a model key. Run `jev-browser --help` or `jev-browser help` for more options.
+
+## 3. How it works
+
+- **TypeScript CLI:** parses the instruction, builds target candidates from the page snapshot, and validates model answers.
+- **Jev:** chooses from supplied options. It does not generate browser scripts; input values come from the user's original text or explicit parameters.
+- **Bundled Rust executor:** uses forked agent-browser source to connect to the browser, perform atomic actions, and retain sessions.
+
+Ambiguous or stale targets stop execution. An action with an unknown outcome is never automatically replayed.
+
+For `act 'Fill the "Name" field with "Alex"'`, the CLI first identifies the action, then asks target and value questions together.
+
+`--op` skips action classification. Consecutive operations observe the updated page and are not batched into one model request.
+
+## 4. Development
+
+Requires Node.js 22+ and stable Rust. From the repository root:
 
 ```bash
 npm ci
@@ -92,19 +100,28 @@ npm test
 node dist/cli.js --help
 ```
 
-日常修改 `src/` 下的 TypeScript，只需重新运行 `npm run build`；修改 `cli/` 中的 Rust 代码或更新上游后，再运行 `npm run build:core`。
+For TypeScript changes in `src/`, rerun `npm run build`. Rebuild the executor with `npm run build:core` after changing Rust code in `cli/` or updating upstream source.
 
-打包：
+Create a local package:
 
 ```bash
 node scripts/licenses.mjs
 npm pack
 ```
 
-生成的 `jev-browser-0.1.0.tgz` 包含本机执行器。跨平台构建见 [.gitlab-ci.yml](.gitlab-ci.yml)。
+Build and publish:
 
-连接专用测试浏览器后，可运行 `JEV_TEST_CDP=9222 npm run test:smoke`；配置 OpenRouter Key 后，可运行 `JEV_TEST_CDP=9222 npm run test:live`。已执行的用例和范围见 [VALIDATION.md](VALIDATION.md)。
+```bash
+npm run publish -- --dry-run  # Build and preview without uploading
+npm run publish              # Build and publish with registry credentials
+```
 
-## 5. 开源协议
+The command builds Rust and TypeScript, collects licenses, checks the package, and publishes it. Any failed step stops the process.
 
-采用 [Apache-2.0](LICENSE)。浏览器执行能力基于 [agent-browser](https://github.com/vercel-labs/agent-browser) 源码，版本和修改记录见 [UPSTREAM.json](UPSTREAM.json)，第三方授权见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Pass npm options after `--`. The build targets the current machine; the package includes binaries already present in `libexec/`.
+
+With a dedicated test browser exposing CDP on port 9222, run `JEV_TEST_CDP=9222 npm run test:smoke`. Use `test:live` with an OpenRouter key for real model calls. Tested coverage is recorded in [VALIDATION.md](VALIDATION.md).
+
+## 5. License
+
+[Apache-2.0](LICENSE). Browser execution is based on [agent-browser](https://github.com/vercel-labs/agent-browser). See [UPSTREAM.json](UPSTREAM.json) for the source revision and patches, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency licenses.

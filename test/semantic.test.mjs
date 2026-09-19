@@ -81,6 +81,16 @@ test('原文值选择与目标独立，空白、换行、shell 字符保持原�
   await act(options({ op: undefined, instruction: '在“姓名”中填写“张三”' }), q.browser, q.jev);
   assert.deepEqual(q.commands.at(-1).args, ['fill', '@e2', '张三']);
   assert.equal(q.requests.length, 2);
+  assert.deepEqual(Object.keys(q.requests[0].questions), ['operation']);
+  assert.deepEqual(Object.keys(q.requests[1].questions).sort(), ['target', 'value']);
+});
+
+test('已知动作时，目标与原文值在一次请求中批量判断', async () => {
+  const s = setup({ target: 'e2', value: 'v1' });
+  await act(options({ op: 'fill', instruction: '在“姓名”中填写“张三”' }), s.browser, s.jev);
+  assert.equal(s.requests.length, 1);
+  assert.deepEqual(Object.keys(s.requests[0].questions).sort(), ['target', 'value']);
+  assert.deepEqual(s.commands.at(-1).args, ['fill', '@e2', '张三']);
 });
 
 test('缺少参数立即停止，未知操作与协议不放行', async () => {
