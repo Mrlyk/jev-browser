@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>Jev 浏览器测试页面</title>
+<body>
+  <section aria-label="入住信息">
+    <h2>入住信息</h2>
+    <label>姓名<input id="name" aria-label="姓名"></label>
+    <label>密码<input id="password" type="password" aria-label="密码"></label>
+    <label><input id="agreement" type="checkbox">同意用户协议</label>
+    <label>人数<select id="people" aria-label="人数"><option value="1">1人</option><option value="2">2人</option></select></label>
+    <button id="guest-confirm" onclick="document.querySelector('#result').textContent = '入住已确认'">确认</button>
+  </section>
+  <section aria-label="发票信息">
+    <h2>发票信息</h2>
+    <button id="invoice-confirm" onclick="document.querySelector('#result').textContent = '发票已确认'">确认</button>
+  </section>
+  <p id="result" role="status" aria-label="操作结果">等待操作</p>
+</body>
+</html>

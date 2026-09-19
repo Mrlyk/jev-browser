@@ -1,0 +1,14 @@
+# idea
+.idea/
+node_modules/
+dist/
+libexec/
+.cache/
+cli/target/
+packages/dashboard/out/
+*.tgz
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store

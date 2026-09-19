@@ -1,0 +1,83 @@
+import { JevError, object } from './errors.js';
+
+export type Question = { type: 'choice'; instructions: string; criteria: Record<string, string> };
+export type Answer = { type: 'choice'; choice: string; probabilities: Record<string, number>; confidence: number };
+export type Evaluation = { model: string; answers: Record<string, Answer>; usage?: unknown; id?: string };
+export type ModelConfig = { transport: 'typesafe' | 'openrouter'; endpoint: string; model: string; key: string };
+
+export function modelConfig(env = process.env): ModelConfig {
+  if (env.TYPESAFE_API_KEY?.trim()) return {
+    transport: 'typesafe', endpoint: 'https://api.typesafe.ai/v1/systemone',
+    model: env.TYPESAFE_MODEL?.trim() || 'jev-latest', key: env.TYPESAFE_API_KEY.trim(),
+  };
+  if (env.OPENROUTER_API_KEY?.trim()) return {
+    transport: 'openrouter', endpoint: 'https://openrouter.ai/api/alpha/decisions',
+    model: env.OPENROUTER_MODEL?.trim() || '~typesafe/jev-latest', key: env.OPENROUTER_API_KEY.trim(),
+  };
+  throw new JevError('MISSING_API_KEY', 'act 需要 TYPESAFE_API_KEY 或 OPENROUTER_API_KEY。');
+}
+
+export function choice(instructions: string, criteria: Record<string, string>): Question {
+  return { type: 'choice', instructions, criteria };
+}
+
+function probability(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+export function validateEvaluation(raw: unknown, questions: Record<string, Question>): Evaluation {
+  const invalid = () => new JevError('INVALID_MODEL_RESPONSE', '模型响应缺少字段、包含未知选项或非法概率。');
+  if (!object(raw) || typeof raw.model !== 'string' || !raw.model || !object(raw.answers)) throw invalid();
+  for (const [id, q] of Object.entries(questions)) {
+    const a = raw.answers[id];
+    if (!object(a) || a.type !== 'choice' || typeof a.choice !== 'string' ||
+      !Object.hasOwn(q.criteria, a.choice) || !probability(a.confidence) || !object(a.probabilities)) throw invalid();
+    const keys = Object.keys(q.criteria);
+    if (keys.length !== Object.keys(a.probabilities).length ||
+      !keys.every(k => Object.hasOwn(a.probabilities, k) && probability(a.probabilities[k]))) throw invalid();
+    const values = Object.values(a.probabilities) as number[];
+    if (Math.abs(values.reduce((s, p) => s + p, 0) - 1) > 0.025 ||
+      a.probabilities[a.choice] < Math.max(...values)) throw invalid();
+  }
+  return raw as Evaluation;
+}
+
+export function accepted(answer: Answer, thresholds = { probability: 0.85, margin: 0.2 }): string {
+  const selected = answer.probabilities[answer.choice];
+  const second = Math.max(0, ...Object.entries(answer.probabilities).filter(([k]) => k !== answer.choice).map(([, p]) => p));
+  if (selected < thresholds.probability || selected - second < thresholds.margin)
+    throw new JevError('AMBIGUOUS', '模型选择未达到概率或候选差值阈值，未执行动作。');
+  return answer.choice;
+}
+
+export class Jev {
+  readonly evidence: Array<Record<string, unknown>> = [];
+  constructor(readonly config: ModelConfig, private request: typeof fetch = fetch) {}
+
+  async evaluate(state: unknown, questions: Record<string, Question>): Promise<Evaluation> {
+    for (const q of Object.values(questions)) {
+      if (Object.keys(q.criteria).length > 255) throw new JevError('TOO_MANY_CANDIDATES', '候选超过 255 个，请使用 --scope 缩小范围。');
+    }
+    const body = JSON.stringify({ model: this.config.model, state, questions });
+    // Conservative byte budget: no silent truncation and no guessed token count.
+    if (Buffer.byteLength(body) > 48_000) throw new JevError('CONTEXT_TOO_LARGE', '模型输入超过首版 48 KB 上限，请缩小观察范围。');
+    const start = performance.now();
+    try {
+      const response = await this.request(this.config.endpoint, {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${this.config.key}`, 'Content-Type': 'application/json' }, body,
+      });
+      if (!response.ok) throw new JevError(`MODEL_HTTP_${response.status}`, `${this.config.transport} 返回 HTTP ${response.status}，未执行动作。`);
+      const raw = await response.json();
+      const result = validateEvaluation(raw, questions);
+      this.evidence.push({ transport: this.config.transport, requestedModel: this.config.model,
+        resolvedModel: result.model, requestId: result.id ?? response.headers.get('x-request-id') ?? undefined,
+        usage: result.usage, answers: result.answers, durationMs: Math.round(performance.now() - start) });
+      return result;
+    } catch (error) {
+      if (error instanceof JevError) throw error;
+      if (error instanceof SyntaxError) throw new JevError('INVALID_MODEL_RESPONSE', '模型返回了无效 JSON。');
+      throw new JevError('MODEL_UNAVAILABLE', `${this.config.transport} 请求失败或超时；未切换通道。`);
+    }
+  }
+}

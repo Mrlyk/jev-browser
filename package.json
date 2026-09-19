@@ -1,0 +1,20 @@
+{
+  "name": "jev-browser",
+  "version": "0.1.0",
+  "description": "Jev semantic browser CLI with an embedded Rust browser executor",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": { "jev-browser": "dist/cli.js" },
+  "engines": { "node": ">=22.0.0" },
+  "files": ["dist", "libexec", "skill-data", "third-party", "LICENSE", "THIRD_PARTY_NOTICES.md", "UPSTREAM.json"],
+  "scripts": {
+    "build": "tsc && node scripts/finish-build.mjs",
+    "build:core": "node scripts/build-core.mjs",
+    "dev": "npm run build && node dist/cli.js",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:smoke": "npm run build && node test/smoke.mjs",
+    "check": "tsc --noEmit",
+    "prepack": "npm run build && node scripts/check-package.mjs"
+  },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.0" }
+}
