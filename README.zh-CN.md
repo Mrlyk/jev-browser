@@ -42,6 +42,8 @@ export OPENROUTER_API_KEY="你的 OpenRouter Key"
 
 配套 Skill 位于 `skills/jev-browser/`。支持 Skill 的 Agent 可加载该目录；其他模型可先读取 `SKILL.md`，再按其中的说明调用 CLI。
 
+`references/` 下的四份指南分别介绍命令、快照、会话与认证、排错。当前源码构建支持 `jev-browser skills get jev-browser` 读取主指南；仅在需要全部参考时加 `--full`。
+
 ### 直接用语言操作
 
 打开浏览器后，使用 `act` 描述要执行的动作：
@@ -125,6 +127,8 @@ npm run publish              # 构建并发布，需要对应 registry 的发布
 命令依次构建 Rust 执行器和 TypeScript、整理许可证、校验安装包，再执行发布；任一步失败即停止。`--tag`、`--registry` 等 npm 参数可放在 `--` 后。当前流程只编译本机平台，安装包包含 `libexec/` 中已准备的平台二进制。
 
 连接专用测试浏览器后，可运行 `JEV_TEST_CDP=9222 npm run test:smoke`；配置 OpenRouter Key 后，可运行 `JEV_TEST_CDP=9222 npm run test:live`。已执行的用例和范围见 [VALIDATION.md](VALIDATION.md)。
+
+构建执行器后，运行 `npm run test:skills` 检查技能发现、参考文档加载与旧入口退役，无需启动浏览器。
 
 ## 5. 开源协议
 

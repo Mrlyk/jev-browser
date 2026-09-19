@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { Jev, modelConfig, choice, validateEvaluation, accepted } from '../dist/jev.js';
 import { coreEnv } from '../dist/browser.js';
+import { fileURLToPath } from 'node:url';
 
 const questions = { target: choice('选目标', { e1: '确认', none: '不存在' }) };
 const valid = () => ({ model: 'jev-test', answers: { target: {
@@ -74,4 +75,5 @@ test('执行器不继承模型 Key 和原版运行配置', () => {
   assert.equal(env.AGENT_BROWSER_SOCKET_DIR, '/tmp/jev-test');
   assert.equal(env.AGENT_BROWSER_NAMESPACE, 'jev');
   assert.equal(env.AGENT_BROWSER_NO_REPLAY, '1');
+  assert.equal(env.AGENT_BROWSER_SKILLS_DIR, fileURLToPath(new URL('../skills', import.meta.url)));
 });

@@ -23,7 +23,7 @@ export function coreEnv(env = process.env): NodeJS.ProcessEnv {
   result.AGENT_BROWSER_SOCKET_DIR = runtimeDir(env);
   result.AGENT_BROWSER_NAMESPACE = 'jev';
   result.AGENT_BROWSER_NO_REPLAY = '1';
-  result.AGENT_BROWSER_SKILLS_DIR = fileURLToPath(new URL('../skill-data', import.meta.url));
+  result.AGENT_BROWSER_SKILLS_DIR = fileURLToPath(new URL('../skills', import.meta.url));
   return result;
 }
 

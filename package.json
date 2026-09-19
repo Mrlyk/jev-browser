@@ -13,7 +13,6 @@
   "files": [
     "dist",
     "libexec",
-    "skill-data",
     "skills",
     "third-party",
     "LICENSE",
@@ -29,6 +28,7 @@
     "test": "npm run build && node --test test/*.test.mjs",
     "test:smoke": "npm run build && node test/smoke.mjs",
     "test:live": "npm run build && node test/live.mjs",
+    "test:skills": "npm run build && node test/skills.mjs",
     "check": "tsc --noEmit",
     "publish": "node scripts/publish.mjs",
     "prepack": "npm run build && node scripts/check-package.mjs"

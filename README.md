@@ -42,6 +42,8 @@ Give the calling model access to a terminal tool and the [jev-browser skill](ski
 
 The companion skill lives in `skills/jev-browser/`. Load that folder with a skill-compatible agent, or have the model read `SKILL.md` before invoking the CLI.
 
+Its four `references/` guides cover commands, snapshots, sessions/authentication, and troubleshooting. Current source builds serve the main guide with `jev-browser skills get jev-browser`; add `--full` only when all references are needed.
+
 ### Operate in natural language
 
 Open a browser, then describe each action with `act`:
@@ -127,6 +129,8 @@ The command builds Rust and TypeScript, collects licenses, checks the package, a
 Pass npm options after `--`. The build targets the current machine; the package includes binaries already present in `libexec/`.
 
 With a dedicated test browser exposing CDP on port 9222, run `JEV_TEST_CDP=9222 npm run test:smoke`. Use `test:live` with an OpenRouter key for real model calls. Tested coverage is recorded in [VALIDATION.md](VALIDATION.md).
+
+After building the executor, `npm run test:skills` checks skill discovery, reference loading, and retired entries without launching a browser.
 
 ## 5. License
 

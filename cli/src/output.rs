@@ -3686,9 +3686,9 @@ Environment:
 
         "skills" => {
             r##"
-agent-browser skills - List and retrieve bundled skill content
+jev-browser skills - Read the companion skill and its references
 
-Usage: agent-browser skills [subcommand] [options]
+Usage: jev-browser skills [subcommand] [options]
 
 Subcommands:
   list                       List all available skills (default)
@@ -3700,23 +3700,15 @@ Subcommands:
 Options:
   --json                     Output as JSON
 
-The skills command serves bundled skill content that always matches the
-installed CLI version. Agents should use this to get current instructions
-rather than relying on cached copies.
+The default get returns the main guide only. Read the linked references
+when needed; --full explicitly includes all four references.
 
 Examples:
-  agent-browser skills
-  agent-browser skills list
-  agent-browser skills get core
-  agent-browser skills get core --full
-  agent-browser skills get protected-vercel-deployments
-  agent-browser skills get electron --full
-  agent-browser skills get --all
-  agent-browser skills path core
-  agent-browser skills list --json
-
-Environment:
-  AGENT_BROWSER_SKILLS_DIR   Override the skills directory path
+  jev-browser skills list
+  jev-browser skills get jev-browser
+  jev-browser skills get jev-browser --full
+  jev-browser skills path jev-browser
+  jev-browser --json skills list
 "##
         }
 
@@ -3792,24 +3784,20 @@ Examples:
 pub fn print_help() {
     println!(
         r#"
-agent-browser - fast browser automation CLI for AI agents
+jev-browser - browser automation command reference for AI agents
 
-Usage: agent-browser <command> [args] [options]
+Usage: jev-browser <command> [args] [options]
 
 Start here (for AI agents):
-  agent-browser skills get core --full
+  jev-browser skills get jev-browser
 
-  Skills ship with the CLI (always version-matched) and include workflow
-  patterns, ref/selector usage, and copy-paste examples. Prefer this over
-  guessing commands from flag docs alone. Specialized skills cover Electron
-  apps, Slack, exploratory testing, protected Vercel deployments, and cloud
-  browser providers.
+  Read the main guide first, then only the references needed for the task.
+  The --full option explicitly includes all four companion references.
 
-  skills [list]                List available skills
-  skills get core              Core usage guide (overview + common patterns)
-  skills get core --full       Include full command reference and templates
-  skills get <name>            Load a specialized skill (electron, slack, ...)
-  skills path [name]           Print skill directory path
+  skills [list]                    List available skills
+  skills get jev-browser           Read the main companion guide
+  skills get jev-browser --full    Include all four references
+  skills path jev-browser          Print the companion skill directory
 
 Core Commands:
   open <url>                 Navigate to URL
