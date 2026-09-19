@@ -8,7 +8,7 @@ import { withSession } from './session.js';
 import { readCredentials } from './credentials.js';
 import { ensureLogin, handleAuth } from './auth.js';
 
-const help = `jev-browser 0.1.1 — Jev 语义浏览器 CLI
+const help = `jev-browser 0.1.2 — Jev 语义浏览器 CLI
 
 用法：jev-browser [全局参数] <命令> [参数]
 
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   if (!args.length || args[0] === '--help' || args[0] === '-h' || (args[0] === 'act' && args[1] === '--help')) {
     process.stdout.write(help); return;
   }
-  if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.1\n'); return; }
+  if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.2\n'); return; }
   const parsed = parseArgs(args);
   if (parsed.name === 'auth' && await handleAuth(parsed.rest, parsed.json)) return;
   if (parsed.name === 'help' && parsed.rest[0] === 'auth') { await handleAuth(['--help'], parsed.json); return; }

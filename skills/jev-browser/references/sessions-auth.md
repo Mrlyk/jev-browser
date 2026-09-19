@@ -4,7 +4,7 @@ Use for browser ownership, CDP, saved login state, and credential input. Adapted
 
 ## Model API keys
 
-Current source builds add local model credentials; npm 0.1.1 uses environment variables only.
+Version 0.1.2 and later support local model credentials and automatic login.
 
 ```bash
 jev-browser auth login  # Hidden input; sh- uses OpenRouter, other keys use TypeSafe

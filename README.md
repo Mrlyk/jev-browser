@@ -39,7 +39,7 @@ and use it for browser tasks in this project.
 
 ### Configure a model
 
-Use an OpenRouter or TypeSafe API key. With a source build, save it once:
+Use an OpenRouter or TypeSafe API key. Version 0.1.2 and later can verify and save it locally:
 
 ```bash
 jev-browser auth login             # Enter a Key to detect its provider, verify and save
@@ -47,7 +47,7 @@ jev-browser auth status            # Check the active provider
 jev-browser auth logout openrouter # Remove the saved Key
 ```
 
-For npm 0.1.1 or CI, use an environment variable:
+For CI, you can also use an environment variable:
 
 ```bash
 export OPENROUTER_API_KEY="your OpenRouter key"

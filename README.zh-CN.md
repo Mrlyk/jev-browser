@@ -39,7 +39,7 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 
 ### 配置模型
 
-准备 OpenRouter 或 TypeSafe API Key。源码构建可登录后保存：
+准备 OpenRouter 或 TypeSafe API Key。0.1.2 及更新版本可登录验证后保存：
 
 ```bash
 jev-browser auth login             # 交互输入 Key，验证后自动识别提供方并保存
@@ -47,7 +47,7 @@ jev-browser auth status            # 查看当前提供方
 jev-browser auth logout openrouter # 删除已保存的 Key
 ```
 
-npm 0.1.1 或 CI 使用环境变量：
+CI 也可使用环境变量：
 
 ```bash
 export OPENROUTER_API_KEY="你的 OpenRouter Key"
@@ -137,7 +137,7 @@ node scripts/licenses.mjs
 npm pack
 ```
 
-生成的 `jev-browser-cli-0.1.1.tgz` 包含本机执行器。
+生成的 `jev-browser-cli-0.1.2.tgz` 包含本机执行器。
 
 构建并发布到 npm：
 

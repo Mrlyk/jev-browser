@@ -1,6 +1,6 @@
 {
   "name": "jev-browser-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Browser automation CLI for AI agents, powered by the Jev model's millisecond decisions and near-zero inference costs",
   "type": "module",
   "license": "Apache-2.0",
