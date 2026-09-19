@@ -1,126 +1,110 @@
 # jev-browser
 
-TypeScript 编写的 Jev 语义浏览器 CLI，内置从 agent-browser v0.38.1 源码构建的 Rust 执行器。一次 `act` 选择并执行一个浏览器原子动作。
+用自然语言操作浏览器的命令行工具，支持点击、填写、选择和页面内容读取。
 
-## 使用
+适用场景：
 
-要求 Node.js 22 或更新版本。发行包内置平台二进制，用户无需安装 agent-browser 或 Rust。当前仓库尚未发布 npm；本地构建方式见下文。
+- 让 AI Agent 按页面含义查找并操作控件。
+- 编写信息查询、表单填写、酒店预订等浏览器自动化脚本。
+- 在 E2E 测试中用语言描述操作，用独立断言验证结果。
+
+## 1. 安装
+
+需要 Node.js 22 或更新版本。当前尚未发布到 npm，使用与你的平台匹配的 `.tgz` 安装包；没有安装包时，按[开发说明](#4-开发说明)从源码构建。
 
 ```bash
-# 安装构建好的发行包
 npm install -g ./jev-browser-0.1.0.tgz
+jev-browser --version
+```
 
-# 确定性命令不需要模型 Key
+安装包自带浏览器执行器，无需单独安装 agent-browser 或 Rust。首次打开页面时会查找 Chrome，缺少时自动下载。Linux 需要浏览器系统依赖；Linux ARM64 请先安装 Chromium，并通过 `--executable-path` 指定路径。
+
+## 2. 使用
+
+### 配置模型
+
+准备一个 OpenRouter 或 TypeSafe API Key，任选一种配置：
+
+```bash
+export OPENROUTER_API_KEY="你的 OpenRouter Key"
+# 使用官方接口时改为：export TYPESAFE_API_KEY="你的 TypeSafe Key"
+```
+
+两个 Key 都配置时优先使用 TypeSafe 官方接口；请求失败不会自动切换通道。
+
+### 直接用语言操作
+
+打开浏览器后，使用 `act` 描述要执行的动作：
+
+```bash
 jev-browser --session demo --headed open https://example.com
-jev-browser --session demo snapshot --json
-jev-browser --session demo click @e1
-
-# 官方或 OpenRouter 配置其中一个即可
-export TYPESAFE_API_KEY="你的官方 Key"
-# export OPENROUTER_API_KEY="你的 OpenRouter Key"
-
-jev-browser --session demo act "点击入住信息区域的确认按钮"
-jev-browser --session demo act --op fill "姓名输入框" --value "张三"
-jev-browser --session demo act --op click "确认按钮" --scope '#guest' --dry-run --json
+jev-browser --session demo act '读取 Example Domain 标题'
+jev-browser --session demo act '点击 Learn more 链接'
+jev-browser --session demo act '返回上一页'
 jev-browser --session demo close
 ```
 
-首次 `open` 会使用已有 Chrome；没有可用浏览器时自动调用内置下载器准备 Chrome for Testing。下载需要网络与可写目录。Linux ARM64 需要系统 Chromium（Google 不提供该平台的 Chrome for Testing）；Linux 系统库由管理员准备。可用 `--executable-path` 指定浏览器。连接已有 CDP 时无需本地下载：
+`--headed` 显示浏览器窗口；使用相同的 `--session` 名称可连续操作同一个浏览器。
+
+操作自己的业务页面时，先用 `open` 打开地址，再描述页面中的实际控件。以下是独立操作示例：
 
 ```bash
-jev-browser --session existing connect 9222
-jev-browser --session existing act --op click "搜索按钮"
-jev-browser --session remote --cdp 'ws://localhost:9222/devtools/browser/...' snapshot --json
+jev-browser --session hotel act '在“酒店关键词”输入框填写“花园”'
+jev-browser --session hotel act '点击搜索酒店按钮'
+jev-browser --session hotel act '点击标准大床房区域的预订按钮'
+jev-browser --session hotel act '勾选同意预订须知'
 ```
 
-CDP 浏览器需要自行开放调试端口，并使用独立用户数据目录。默认受控会话由工具启动并复用。
+一次 `act` 执行一个动作，多步流程按顺序调用。填写内容用引号标明；同名控件加上所在区域。返回 `executed` 表示动作完成，业务是否成功仍需检查页面或接口结果。
 
-## 模型通道
-
-| 配置 | 调用通道 | 默认模型 |
-| --- | --- | --- |
-| `TYPESAFE_API_KEY` 非空 | TypeSafe 官方 | `jev-latest` |
-| 只有 `OPENROUTER_API_KEY` 非空 | OpenRouter | `~typesafe/jev-latest` |
-| 两个都有 | TypeSafe 官方 | `jev-latest` |
-| 两个都没有 | `act` 返回 `MISSING_API_KEY` | 原子命令仍可用 |
-
-官方使用 `POST https://api.typesafe.ai/v1/systemone`，OpenRouter 使用 `POST https://openrouter.ai/api/alpha/decisions`。两者共用 `state + questions`。分别通过 `TYPESAFE_MODEL`、`OPENROUTER_MODEL` 固定版本；输出记录实际返回的模型版本。模型请求超时 30 秒，首版不自动重试或切换通道。
-
-协议来源：[TypeSafe API](https://docs.typesafe.ai/api)、[OpenRouter Decisions](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-questions-and-answers-request)、[OpenRouter latest 别名](https://openrouter.ai/~typesafe/jev-latest)。
-
-Key 只在 Node 进程中读取；启动 Rust 执行器前移除两个模型 Key。`--value` 不进入模型请求。敏感值可经标准输入传入：
+### 常用控制
 
 ```bash
-printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill "密码输入框" --value-stdin
+# 已知动作类型时，只让模型选择目标
+jev-browser --session hotel act --op fill '入住人姓名输入框' --value '张三'
+
+# 预览选择，不执行动作；用 JSON 输出结果
+jev-browser --session hotel act --op click '确认预订按钮' --dry-run --json
+
+# 敏感值从标准输入读取
+printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill '密码输入框' --value-stdin
 ```
 
-标准输入原样保留，包括末尾换行。内部通过单条 JSON batch 的 stdin 传值，不放进子进程命令行，也不回显写入值。页面快照中的其他可见内容仍可能成为模型候选。
+已知选择器时，也可直接使用 `click '#submit'`、`fill '#name' '张三'` 等命令，无需模型 Key。更多参数见 `jev-browser --help` 和 `jev-browser help`。
 
-## 支持范围
+## 3. 实现原理简述
 
-| 入口 | 能力 |
-| --- | --- |
-| 原子命令 | 继承导航、观察、点击、填写、截图、键鼠、标签页、frame、上传下载、网络与存储操作 |
-| `act` | click、dblclick、fill、type、check、uncheck、hover、focus、select、scrollintoview、get_text、open、back、forward、reload、scroll、press |
+- **TypeScript CLI**：解析指令，从页面快照中整理目标候选，并检查模型返回的结果。
+- **Jev**：从给定候选中选择，不生成浏览器脚本；填写值取自用户原文或显式参数。
+- **内置 Rust 执行器**：复用 agent-browser 源码连接浏览器，执行点击、填写等操作，并保持会话。
 
-`act --op` 把文字当作目标描述；完整 `act` 先选择操作类型。填写值来自 `--value`、stdin 或用户指令中的引号片段。`select` 支持原生下拉框的值或可见标签；自定义下拉组件需要分步调用。`scroll` 首版每次滚动 500 px；`press` 支持帮助和源码动作表中的常用按键与组合键。
+目标不明确或页面已变化时，工具停止执行；动作派发后结果未知时，不自动重放。
 
-原生日期输入框可以填写完整 ISO 日期，例如 `act --op fill "离店日期输入框" --value 2026-10-13`。非法日期格式会报错并保留原值；日期范围等业务规则仍由页面处理。
+## 4. 开发说明
 
-```bash
-jev-browser act '在“姓名”中填写“张三”'
-jev-browser act '向下滚动'
-jev-browser act --op press '按回车' --value Enter
-jev-browser act --op open '打开网站' --value https://example.com
-```
-
-首版没有任务规划、多步自动执行、E2E 框架、截图识别、扩展、MCP Server 或公开 SDK。`dashboard` 暂未打包；`upgrade` 提示更新整个 npm 包。`jev-browser help` 可查看上游原子命令说明，底层帮助保留部分上游名称。
-
-## 执行约束与返回
-
-- 每个目标题最多 253 个目标，另加 none、ambiguous；超限要求 `--scope <CSS>`，不截断候选。模型请求 JSON 最大 48 KB。
-- 默认最高选项概率至少 0.85，领先第二名至少 0.20；可用 `--min-probability`、`--min-margin` 调整。这些工程初值尚未经过真实 Jev 中文数据集校准。
-- 同会话从观察到执行持有文件锁，并发调用返回 `SESSION_BUSY`。异常进程留下的锁需确认 PID 已结束后手动清理，工具不抢占锁。
-- 执行前复核页面、frame、DOM 节点、引用、名称、区域和可操作状态。无法确认 DOM 身份的虚拟节点返回 `STALE_TARGET`。外部人工操作与最终派发之间仍存在时间窗口。
-- `--dry-run` 返回 `resolved`，不派发动作。成功执行返回 `executed`，表示原子动作完成，业务结果需调用方独立验证。
-- 派发后连接中断或超时返回 `EXECUTION_UNKNOWN`，禁止自动重放。标准输出用于结果；错误退出码为 1，错误 JSON 含 `code`、`message`、`dispatched`。
-
-`--json` 包含目标、候选数量、快照标识、每次模型选择与概率、通道、用量和各阶段耗时。默认不将网页快照或模型请求写入磁盘。
-
-原版状态与本工具隔离：配置文件为 `jev-browser.json`、用户配置与授权状态在 `~/.jev-browser/`；socket 和锁默认在临时目录 `jvb-<uid>`，可用 `JEV_BROWSER_RUNTIME_DIR` 更改。运行配置用 `JEV_BROWSER_` 前缀，原版 `AGENT_BROWSER_` 环境配置不会被继承。显式传入的 profile、state 和下载路径由调用方控制。
-
-## 开发与打包
+源码开发需要 Node.js 22+ 和 Rust stable。在仓库根目录运行：
 
 ```bash
 npm ci
-npm run build:core    # 首次、修改 Rust 或更新上游时需要当前 stable Rust
-node scripts/licenses.mjs
+npm run build:core
 npm run build
-node dist/cli.js --help
 npm test
+node dist/cli.js --help
+```
+
+日常修改 `src/` 下的 TypeScript，只需重新运行 `npm run build`；修改 `cli/` 中的 Rust 代码或更新上游后，再运行 `npm run build:core`。
+
+打包：
+
+```bash
+node scripts/licenses.mjs
 npm pack
 ```
 
-日常语义开发只修改 `src/`，执行 `npm run build`；Rust 源码保留在 `cli/`。`libexec/` 是构建产物，不提交二进制。`npm pack` 会检查当前平台执行器存在，npm 入口始终为 JavaScript，无改写入口的 postinstall。
+生成的 `jev-browser-0.1.0.tgz` 包含本机执行器。跨平台构建见 [.gitlab-ci.yml](.gitlab-ci.yml)。
 
-`.gitlab-ci.yml` 定义五个平台的原生构建及合并打包：macOS ARM64/x64、Linux x64/ARM64、Windows x64。对应 runner 需要 Node.js 22+、当前 stable Rust，并配置文件中声明的 runner tags。设置 `JEV_RELEASE=1` 打包时强制检查所有平台文件；流水线只产出 tarball，不发布 npm。当前本地打包只包含本机平台。
+连接专用测试浏览器后，可运行 `JEV_TEST_CDP=9222 npm run test:smoke`；配置 OpenRouter Key 后，可运行 `JEV_TEST_CDP=9222 npm run test:live`。已执行的用例和范围见 [VALIDATION.md](VALIDATION.md)。
 
-验证真实浏览器执行可连接任务专用 Chrome：
+## 5. 开源协议
 
-```bash
-JEV_TEST_CDP=9222 npm run test:smoke
-```
-
-该测试使用本地页面和标记为 `synthetic` 的模型选择，独立断言填写值、勾选状态、下拉值及中文按钮效果。配置 `OPENROUTER_API_KEY` 后，可复现真实模型与完整 CLI 的验证：
-
-```bash
-JEV_TEST_CDP=9222 npm run test:live
-```
-
-真实测试使用 OpenRouter，覆盖 11 个固定中文页面场景及 CLI 标准输入填写，输出每步选择、概率、实际模型版本、用量与耗时到本机 `.cache/live-validation-*.json`。2026-09-19 已验证 latest 别名解析为 `typesafe/jev-1.13-20260917`，详细结果见 VALIDATION.md。
-
-另已通过 SuperHarness 执行普通页面和酒店预订模拟的 25 项 Playwright E2E：CLI 负责操作，Playwright 独立断言并记录视频和业务请求。任务位于 `.superharness/tasks/09-19-jev-usage-hotel/`；其 `e2e/` 脚本、冻结数据和报告保留在本机并按技能规则忽略，不随 npm 包分发。酒店数据为 synthetic，不涉及真实酒店订单或支付。
-
-## 来源与许可证
-
-基于 agent-browser 源码 fork，固定到 v0.38.1 / aff6125c023b810ea3f2e5deec5379e9a4270bdc。未通过 npm 依赖、全局 PATH 或 npx 调用 agent-browser。项目采用 Apache-2.0，来源与补丁记录见 UPSTREAM.json，第三方声明见 THIRD_PARTY_NOTICES.md。
+采用 [Apache-2.0](LICENSE)。浏览器执行能力基于 [agent-browser](https://github.com/vercel-labs/agent-browser) 源码，版本和修改记录见 [UPSTREAM.json](UPSTREAM.json)，第三方授权见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
