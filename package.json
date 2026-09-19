@@ -13,6 +13,7 @@
     "dev": "npm run build && node dist/cli.js",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:smoke": "npm run build && node test/smoke.mjs",
+    "test:live": "npm run build && node test/live.mjs",
     "check": "tsc --noEmit",
     "prepack": "npm run build && node scripts/check-package.mjs"
   },

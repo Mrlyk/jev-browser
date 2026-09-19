@@ -49,7 +49,10 @@ export async function act(options: ActOptions, browser: Browser, jev: Jev) {
     before = await observe(browser, options.scope);
     timings.snapshotMs = Math.round(performance.now() - t);
     candidates = candidatesFor(before, op);
-    questions.target = choice(`选择唯一符合用户描述的 ${op} 目标。${boundaries}`, {
+    const readRule = op === 'get_text'
+      ? '读取目标包含的完整文本。用户以名称描述某个区域或容器时，选该容器本身；只有指令描述具体文字内容时才选 StaticText。status 表示状态区域。祖先上下文只用于确定归属，不是当前元素自身的名称。'
+      : '';
+    questions.target = choice(`选择唯一符合用户描述的 ${op} 目标。${readRule}${boundaries}`, {
       ...Object.fromEntries(candidates.map(c => [c.ref, `${c.context} > ${c.role} ${JSON.stringify(c.name)}`])), ...escapes,
     });
   }

@@ -28,4 +28,7 @@ writeFileSync(file, blocks.join('').replace(/\r\n/g, '\n').replace(/[ \t]+$/gm, 
 const axe = join(output, 'axe.min.js');
 if (existsSync(axe)) readFileSync(axe);
 copyFileSync(join(root, 'cli/src/native/a11y/axe.min.js'), axe);
+const axeNotices = join(output, 'AXE-THIRD-PARTY.txt');
+if (existsSync(axeNotices)) readFileSync(axeNotices);
+copyFileSync(join(root, 'cli/src/native/a11y/LICENSE-axe-core-THIRD-PARTY.txt'), axeNotices);
 console.log(`Collected licenses for ${metadata.packages.length - 1} crates.`);

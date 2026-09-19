@@ -109,7 +109,13 @@ npm pack
 JEV_TEST_CDP=9222 npm run test:smoke
 ```
 
-该测试使用本地页面和标记为 `synthetic` 的模型选择，独立断言填写值、勾选状态、下拉值及中文按钮效果；它验证执行链路，不测模型语义准确率。真实 API 联调需要自行配置 Key 后运行 `act`。
+该测试使用本地页面和标记为 `synthetic` 的模型选择，独立断言填写值、勾选状态、下拉值及中文按钮效果。配置 `OPENROUTER_API_KEY` 后，可复现真实模型与完整 CLI 的验证：
+
+```bash
+JEV_TEST_CDP=9222 npm run test:live
+```
+
+真实测试使用 OpenRouter，覆盖 11 个固定中文页面场景及 CLI 标准输入填写，输出每步选择、概率、实际模型版本、用量与耗时到本机 `.cache/live-validation-*.json`。2026-09-19 已验证 latest 别名解析为 `typesafe/jev-1.13-20260917`，详细结果见 VALIDATION.md。
 
 ## 来源与许可证
 
