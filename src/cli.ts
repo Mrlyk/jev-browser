@@ -6,7 +6,7 @@ import { act } from './semantic.js';
 import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
 
-const help = `jev-browser 0.1.0 — Jev 语义浏览器 CLI
+const help = `jev-browser 0.1.1 — Jev 语义浏览器 CLI
 
 用法：jev-browser [全局参数] <命令> [参数]
 
@@ -44,9 +44,9 @@ async function main(): Promise<void> {
   if (!args.length || args[0] === '--help' || args[0] === '-h' || (args[0] === 'act' && args[1] === '--help')) {
     process.stdout.write(help); return;
   }
-  if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.0\n'); return; }
+  if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.1\n'); return; }
   const parsed = parseArgs(args);
-  if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser 更新完整安装包。');
+  if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser-cli 更新完整安装包。');
   if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', '首版尚未打包上游 Dashboard。');
   const browser = new Browser(parsed.globals);
   await withSession(parsed.session, async () => {

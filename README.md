@@ -23,6 +23,18 @@ jev-browser --version
 
 The package includes its browser executor; users do not need agent-browser or Rust. On the first `open`, it finds Chrome or downloads it. Linux needs browser system libraries. On Linux ARM64, install Chromium and pass `--executable-path`.
 
+### Copy to your agent
+
+Paste this prompt into your coding agent to install both the CLI and its companion skill:
+
+```text
+Install the jev-browser CLI with `npm install -g jev-browser-cli`.
+Then run `npx skills add Mrlyk/jev-browser --skill jev-browser` and select
+your agent. Read the skill at
+https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
+and use it for browser tasks in this project.
+```
+
 ## 2. Usage
 
 ### Configure a model
@@ -42,7 +54,7 @@ Give the calling model access to a terminal tool and the [jev-browser skill](ski
 
 The companion skill lives in `skills/jev-browser/`. Load that folder with a skill-compatible agent, or have the model read `SKILL.md` before invoking the CLI.
 
-Its four `references/` guides cover commands, snapshots, sessions/authentication, and troubleshooting. Current source builds serve the main guide with `jev-browser skills get jev-browser`; add `--full` only when all references are needed.
+Its four `references/` guides cover commands, snapshots, sessions/authentication, and troubleshooting. Version 0.1.1 and later serve the main guide with `jev-browser skills get jev-browser`; add `--full` only when all references are needed.
 
 ### Operate in natural language
 

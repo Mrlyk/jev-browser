@@ -23,6 +23,18 @@ jev-browser --version
 
 安装包自带浏览器执行器，无需单独安装 agent-browser 或 Rust。首次打开页面时会查找 Chrome，缺少时自动下载。Linux 需要浏览器系统依赖；Linux ARM64 请先安装 Chromium，并通过 `--executable-path` 指定路径。
 
+### 复制给 Agent
+
+将下面的提示词粘贴给编程 Agent，让它安装 CLI 和配套 Skill：
+
+```text
+执行 `npm install -g jev-browser-cli` 安装 jev-browser CLI，
+再执行 `npx skills add Mrlyk/jev-browser --skill jev-browser` 安装配套 Skill，
+并选择你当前使用的 Agent。读取 Skill：
+https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
+之后在本项目的浏览器任务中使用这个 Skill。
+```
+
 ## 2. 使用
 
 ### 配置模型
@@ -42,7 +54,7 @@ export OPENROUTER_API_KEY="你的 OpenRouter Key"
 
 配套 Skill 位于 `skills/jev-browser/`。支持 Skill 的 Agent 可加载该目录；其他模型可先读取 `SKILL.md`，再按其中的说明调用 CLI。
 
-`references/` 下的四份指南分别介绍命令、快照、会话与认证、排错。当前源码构建支持 `jev-browser skills get jev-browser` 读取主指南；仅在需要全部参考时加 `--full`。
+`references/` 下的四份指南分别介绍命令、快照、会话与认证、排错。0.1.1 及更新版本支持 `jev-browser skills get jev-browser` 读取主指南；仅在需要全部参考时加 `--full`。
 
 ### 直接用语言操作
 
@@ -115,7 +127,7 @@ node scripts/licenses.mjs
 npm pack
 ```
 
-生成的 `jev-browser-cli-0.1.0.tgz` 包含本机执行器。
+生成的 `jev-browser-cli-0.1.1.tgz` 包含本机执行器。
 
 构建并发布到 npm：
 

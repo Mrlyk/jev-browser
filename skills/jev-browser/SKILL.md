@@ -10,7 +10,7 @@ Use this CLI as the browser execution tool for the user's task. You plan the wor
 ## Start
 
 - Install **`jev-browser-cli`** from npm; invoke **`jev-browser`**. The npm package named `jev-browser` is a different project. Check `jev-browser --version` and `jev-browser --help`.
-- Node.js 22+ is required. The published 0.1.0 binary targets macOS Apple Silicon; other platforms require a source build. The browser executor is bundled.
+- Node.js 22+ is required. The published binary targets macOS Apple Silicon; other platforms require a source build. The browser executor is bundled.
 - `act` reads `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` from the invoking process. TypeSafe wins when both are set. Do not expose keys or change providers to bypass an error. Atomic commands need no model key.
 
 ## Operate one step at a time
@@ -43,4 +43,4 @@ jev-browser --session task-demo --json close
 | Session isolation, CDP, browser startup, profiles, saved login state | [sessions-auth.md](references/sessions-auth.md) |
 | Rejection codes, launch/configuration failures, uncertain execution | [troubleshooting.md](references/troubleshooting.md) |
 
-Links are relative to this skill folder. In current builds, `jev-browser skills path jev-browser` locates the installed folder and `jev-browser skills get jev-browser` reads this entrypoint. `--full` includes all four references; use it only when the complete manual is needed.
+Links are relative to this skill folder. In version 0.1.1 and later, `jev-browser skills path jev-browser` locates the installed folder and `jev-browser skills get jev-browser` reads this entrypoint. `--full` includes all four references; use it only when the complete manual is needed.

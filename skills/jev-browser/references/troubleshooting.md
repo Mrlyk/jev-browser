@@ -31,7 +31,7 @@ Native atomic errors can use a different envelope, including a string `error` an
 
 ## Skill discovery
 
-Current source builds serve `skills/jev-browser/`:
+Version 0.1.1 and later serve `skills/jev-browser/`:
 
 ```bash
 jev-browser skills list
@@ -41,4 +41,4 @@ jev-browser skills path jev-browser
 
 The default `get` returns only the main guide. Read the referenced file from the returned folder when needed. `skills get jev-browser --full` explicitly includes all four reference files.
 
-If an older installed release lacks this entry, use the repository's companion skill folder or build the current source. The old upstream `core` entry is no longer part of the active skill set. Retained specialty documents under source `skill-data/` are upstream reference material, not installed jev-browser skills.
+If an older installed release lacks this entry, upgrade with `npm install -g jev-browser-cli@latest` or use the repository's companion skill folder. The old upstream `core` entry is no longer part of the active skill set. Retained specialty documents under source `skill-data/` are upstream reference material, not installed jev-browser skills.
