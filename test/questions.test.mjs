@@ -26,9 +26,26 @@ test('search buttons remain auxiliary input context and never gate other target 
   }))] };
   const built = buildQuestions({ instruction: '搜索 jev', probability: .8, margin: .2 }, before);
   assert.deepEqual(built.state.page.buttons, [{ name: '搜索', context: '' }]);
+  assert.deepEqual(built.state.page.inputs, [{ ref: 'e5', role: 'searchbox', name: 'searchbox', context: '' }]);
   assert.equal(built.state.page.controls, undefined);
   for (const ref of ['e3', 'e6', 'e7', 'e8']) assert.ok(built.questions.target.criteria[ref]);
   assert.ok(built.questions.input_target.criteria.e5);
   const click = buildQuestions({ instruction: '点击 Learn more', op: 'click', probability: .8, margin: .2 }, before);
   assert.deepEqual(click.state.page, { url: 'https://example.com' });
+});
+
+test('search inputs with suggested query names remain explicit page evidence', () => {
+  const before = snapshot({ origin: 'https://www.baidu.com/', pageId: 'p1',
+    snapshot: '- textbox "接冯禧追星运" [ref=e1]\n- button "百度一下" [ref=e2]',
+    refs: { e1: { role: 'textbox', name: '接冯禧追星运' }, e2: { role: 'button', name: '百度一下' } } });
+  for (const op of [undefined, 'fill']) {
+    const built = buildQuestions({ instruction: '搜索jev', op, probability: .8, margin: .2 }, before);
+    assert.deepEqual(built.state.page.inputs, [{ ref: 'e1', role: 'textbox', name: '接冯禧追星运', context: '' }]);
+    assert.deepEqual(built.state.page.buttons, [{ name: '百度一下', context: '' }]);
+    const question = built.questions[op ? 'target' : 'input_target'];
+    assert.equal(question.criteria.e1, '输入框「接冯禧追星运」');
+    assert.ok(question.criteria.none);
+    assert.ok(question.criteria.ambiguous);
+    assert.deepEqual(built.values, { v0: 'jev' });
+  }
 });

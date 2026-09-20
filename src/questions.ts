@@ -83,6 +83,7 @@ export function buildQuestions(options: ActOptions, before: Snapshot) {
   }
   const buttons = input ? before.candidates.filter(c => c.role.toLowerCase() === 'button')
     .map(c => ({ name: c.name, context: c.context })) : [];
+  const pageInputs = inputs.map(c => ({ ref: c.ref, role: c.role, name: c.name, context: c.context }));
   return { questions, candidates, inputs, values, state: { instruction, operation: op,
-    page: { url: before.origin, ...(buttons.length ? { buttons } : {}) } } };
+    page: { url: before.origin, ...(buttons.length ? { buttons } : {}), ...(pageInputs.length ? { inputs: pageInputs } : {}) } } };
 }
