@@ -20,6 +20,37 @@ test('导航超时不安装、不重放', async () => {
   assert.equal(calls, 1);
 });
 
+test('状态检查通过一次 stdin batch 顺序返回结果，false 状态保留', async () => {
+  const b = new Browser([]); const calls = [];
+  const commands = [['is', 'visible', '@e1'], ['is', 'enabled', '@e1']];
+  b.run = async (args, options) => {
+    calls.push({ args, options });
+    return { code: 0, stdout: JSON.stringify([
+      { success: true, result: { visible: false } }, { success: true, result: { enabled: true } },
+    ]) };
+  };
+  assert.deepEqual(await b.requestBatch(commands), [{ visible: false }, { enabled: true }]);
+  assert.deepEqual(calls, [{ args: ['--json', 'batch', '--bail'], options: { input: JSON.stringify(commands) } }]);
+});
+
+test('批次错误、中途停止、缺项、损坏响应和异常退出均拒绝且不重放', async () => {
+  const good = { success: true, result: { visible: true } };
+  const bad = { success: false, error: 'Element detached' };
+  for (const [raw, exitCode, code] of [
+    [[bad], 1, 'BROWSER_ERROR'], [[good, bad], 1, 'BROWSER_ERROR'],
+    [bad, 1, 'BROWSER_ERROR'], [[good], 0, 'INVALID_CORE_RESPONSE'],
+    [[good, good, good], 0, 'INVALID_CORE_RESPONSE'], [[good, null], 0, 'INVALID_CORE_RESPONSE'],
+    [{ success: true }, 0, 'INVALID_CORE_RESPONSE'],
+    [[good, good], 1, 'BROWSER_ERROR'],
+    ['{incomplete', 0, 'INVALID_CORE_RESPONSE'],
+  ]) {
+    const b = new Browser([]); let calls = 0;
+    b.run = async () => { calls++; return { code: exitCode, stdout: typeof raw === 'string' ? raw : JSON.stringify(raw) }; };
+    await assert.rejects(b.requestBatch([['is', 'visible', '@e1'], ['is', 'enabled', '@e1']]), { code, dispatched: false });
+    assert.equal(calls, 1);
+  }
+});
+
 test('敏感值只通过 stdin 单条 batch 传递，输出丢弃 echo', async () => {
   const b = new Browser([]); const secret = ' a\n`secret`'; let invocation;
   b.run = async (args, options) => {

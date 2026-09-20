@@ -34,6 +34,11 @@ function setup(selections, changed) {
     if (args[0] === 'is') return { visible: true, enabled: true };
     return { text: '订单金额 100', value: args.at(-1) };
   } };
+  browser.requestBatch = async args => {
+    const results = [];
+    for (const command of args) results.push(await browser.request(command));
+    return results;
+  };
   return { jev, browser, requests, commands };
 }
 
@@ -50,6 +55,42 @@ test('dry-run 观察与复核后不派发', async () => {
   const s = setup({ target: 'e1' });
   assert.equal((await act(options({ dryRun: true }), s.browser, s.jev)).data.status, 'resolved');
   assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+});
+
+test('隐藏或禁用目标仍拒绝执行，读取和滚入视口仅检查可见性', async () => {
+  for (const state of [{ visible: false, enabled: true }, { visible: true, enabled: false }]) {
+    const s = setup({ target: 'e1' });
+    const original = s.browser.request;
+    s.browser.request = async (args, config) => args[0] === 'is' ? state : original(args, config);
+    await assert.rejects(act(options(), s.browser, s.jev), { code: 'STALE_TARGET', dispatched: false });
+    assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+  }
+  for (const op of ['get_text', 'scrollintoview']) {
+    const s = setup({ target: 'e1' });
+    const original = s.browser.request;
+    s.browser.request = async (args, config) => {
+      assert.notDeepEqual(args.slice(0, 2), ['is', 'enabled']);
+      return original(args, config);
+    };
+    assert.equal((await act(options({ op }), s.browser, s.jev)).data.status, 'executed');
+  }
+});
+
+test('填写后或聚焦后禁用目标，仍停止后续提交且不重放', async () => {
+  for (const disableAfter of ['fill', 'focus']) {
+    const s = setup({ operation: 'input', input_target: 'e2', clear: 1, submit: 1, value: 'v0' });
+    const original = s.browser.request;
+    let disabled = false;
+    s.browser.request = async (args, config) => {
+      if (args[0] === disableAfter) disabled = true;
+      if (args[0] === 'is' && args[1] === 'enabled') return { enabled: !disabled };
+      return original(args, config);
+    };
+    await assert.rejects(act(options({ op: undefined, instruction: '搜索 jev' }), s.browser, s.jev),
+      { code: 'STALE_TARGET', dispatched: true });
+    assert.deepEqual(s.commands.filter(c => c.config?.dispatch).map(c => c.args[0]),
+      disableAfter === 'fill' ? ['fill'] : ['fill', 'focus']);
+  }
 });
 
 test('预览保留会话标签页标题，执行后报告新绑定页面', async () => {

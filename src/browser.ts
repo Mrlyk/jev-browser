@@ -108,8 +108,27 @@ export class Browser {
     try { raw = JSON.parse(result.stdout); }
     catch { throw new JevError(options.dispatch ? 'EXECUTION_UNKNOWN' : 'INVALID_CORE_RESPONSE', 'Browser executor did not return complete JSON.', !!options.dispatch); }
     if (batch && Array.isArray(raw) && raw.length === 1) raw = { ...raw[0], data: raw[0].result };
+    return this.responseData(raw, { ...options, code: result.code });
+  }
+
+  async requestBatch(commands: string[][]): Promise<any[]> {
+    const result = await this.run(['--json', 'batch', '--bail'], { input: JSON.stringify(commands) });
+    let raw: unknown;
+    try { raw = JSON.parse(result.stdout); }
+    catch { throw new JevError('INVALID_CORE_RESPONSE', 'Browser executor did not return complete JSON.'); }
+    if (!Array.isArray(raw)) {
+      this.responseData(raw, { code: result.code });
+      throw new JevError('INVALID_CORE_RESPONSE', 'Expected a batch response.');
+    }
+    const data = raw.map(item => this.responseData(object(item) ? { ...item, data: item.result } : item, { code: 0 }));
+    if (data.length !== commands.length) throw new JevError('INVALID_CORE_RESPONSE', 'Incomplete browser batch response.');
+    if (result.code !== 0) this.responseData({ success: false }, { code: result.code });
+    return data;
+  }
+
+  private responseData(raw: any, options: { code: number; dispatch?: boolean; privateValue?: string }): any {
     if (!object(raw) || typeof raw.success !== 'boolean') throw new JevError('INVALID_CORE_RESPONSE', 'Invalid browser executor response.', !!options.dispatch);
-    if (!raw.success || result.code !== 0) {
+    if (!raw.success || options.code !== 0) {
       let message = typeof raw.error === 'string' ? publicBrowserError(raw.error, this.args) : 'Browser command failed.';
       const unknown = message.includes('EXECUTION_UNKNOWN:') || (!!options.dispatch && /timed? ?out|timeout|connection.*closed|websocket|disconnected/i.test(message));
       if (options.privateValue !== undefined) message = unknown

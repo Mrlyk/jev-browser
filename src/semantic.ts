@@ -119,10 +119,13 @@ export async function validatePlan(plan: Plan, browser: Browser): Promise<void> 
   else if (plan.before.origin !== current.origin || plan.before.pageId !== current.pageId || plan.before.frameId !== current.frameId)
     throw new JevError('STALE_TARGET', 'The page has changed. Run the command again to inspect the current page.');
   if (plan.target && plan.target.role.toLowerCase() !== 'statictext') {
-    if ((await browser.request(['is', 'visible', `@${plan.target.ref}`]))?.visible !== true)
+    const checkEnabled = !['get_text', 'scrollintoview'].includes(plan.operation);
+    const checks = [['is', 'visible', `@${plan.target.ref}`]];
+    if (checkEnabled) checks.push(['is', 'enabled', `@${plan.target.ref}`]);
+    const [visibility, availability] = await browser.requestBatch(checks);
+    if (visibility?.visible !== true)
       throw new JevError('STALE_TARGET', 'The target is no longer visible. Inspect the page before retrying.');
-    if (!['get_text', 'scrollintoview'].includes(plan.operation) &&
-      (await browser.request(['is', 'enabled', `@${plan.target.ref}`]))?.enabled !== true)
+    if (checkEnabled && availability?.enabled !== true)
       throw new JevError('STALE_TARGET', 'The target is no longer enabled. Inspect the page before retrying.');
   }
 }

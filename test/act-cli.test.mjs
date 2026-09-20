@@ -42,6 +42,11 @@ function fixture(t) {
       if (args[0] === 'is') return { visible: true, enabled: true };
       return {};
     };
+    Browser.prototype.requestBatch = async function(commands) {
+      const results = [];
+      for (const command of commands) results.push(await this.request(command));
+      return results;
+    };
   `);
   const env = { ...process.env, NODE_OPTIONS: `--import=${hook}`, TYPESAFE_API_KEY: 'fixture', OPENROUTER_API_KEY: '',
     XDG_CONFIG_HOME: join(root, 'config'), JEV_BROWSER_RUNTIME_DIR: join(root, 'runtime'),
