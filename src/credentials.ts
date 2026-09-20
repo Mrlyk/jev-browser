@@ -30,14 +30,14 @@ export function readCredentials(env = process.env): Credentials {
     return data;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
-    throw new JevError('CREDENTIALS_UNAVAILABLE', '无法读取凭据文件，请检查文件格式和权限。');
+    throw new JevError('CREDENTIALS_UNAVAILABLE', 'Failed to read credentials. Check the file format and permissions.');
   }
 }
 
 export async function saveCredential(provider: Provider, key: string | undefined, env = process.env): Promise<void> {
   const path = credentialsPath(env);
   const directory = dirname(path);
-  if (key !== undefined && !validKey(key)) throw new JevError('INVALID_API_KEY', 'API Key 为空或格式无效。');
+  if (key !== undefined && !validKey(key)) throw new JevError('INVALID_API_KEY', 'API key is empty or invalid.');
   try {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) throw Error();
@@ -58,7 +58,7 @@ export async function saveCredential(provider: Provider, key: string | undefined
     }, directory);
   } catch (error) {
     if (error instanceof JevError) throw error;
-    throw new JevError('CREDENTIALS_UNAVAILABLE', '无法保存凭据，请检查用户配置目录权限。');
+    throw new JevError('CREDENTIALS_UNAVAILABLE', 'Failed to save credentials. Check permissions on the user configuration directory.');
   }
 }
 

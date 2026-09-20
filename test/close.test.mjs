@@ -38,7 +38,7 @@ test('session close rejects extra operands, unknown options and conflicts before
       assert.equal(result.status, 1, result.stderr);
       assert.equal(result.stdout, '');
       assert.match(result.stderr, /INVALID_ARGUMENT/);
-      assert.match(result.stderr, /jev-browser session close/);
+      assert.match(result.stderr, /jevb session (close|clear)/);
       assert(!existsSync(join(root, 'run')), 'invalid input must not create a session');
     }
   }
@@ -89,7 +89,7 @@ test('session clear routes to close all and rejects operands before login', t =>
   for (const tail of [['demo'], ['--all'], ['--unknown']]) {
     const result = run(['session', 'clear', ...tail]);
     assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stderr, /INVALID_ARGUMENT.*jev-browser session clear/);
+    assert.match(result.stderr, /INVALID_ARGUMENT.*jevb session clear/);
     assert(!existsSync(join(root, 'run')));
   }
   for (const args of [['session', 'clear', '--help'], ['help', 'session', 'clear']]) {

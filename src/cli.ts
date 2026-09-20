@@ -50,12 +50,12 @@ close 必须填写会话名；关闭全部会话请使用 session clear。连接
 `;
 
 async function stdinValue(): Promise<string> {
-  if (process.stdin.isTTY) throw new JevError('NEEDS_INPUT', '--value-stdin 需要管道输入。');
+  if (process.stdin.isTTY) throw new JevError('NEEDS_INPUT', '--value-stdin requires piped input.');
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of process.stdin) {
     size += chunk.length;
-    if (size > 1_000_000) throw new JevError('INVALID_VALUE', '标准输入超过 1 MB。');
+    if (size > 1_000_000) throw new JevError('INVALID_VALUE', 'Standard input exceeds the 1 MB limit.');
     chunks.push(Buffer.from(chunk));
   }
   return Buffer.concat(chunks).toString('utf8');
@@ -79,8 +79,8 @@ async function main(): Promise<void> {
     process.stdout.write(help); return;
   }
   if (!showingHelp && !parsed.options.confirm && !parsed.options.cancel) await ensureLogin();
-  if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser-cli 更新完整安装包。');
-  if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', '首版尚未打包上游 Dashboard。');
+  if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', 'Update the package with npm install -g jev-browser-cli.');
+  if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', 'The dashboard is not included in this package.');
   const browser = new Browser(parsed.globals);
   if (showingHelp) {
     const result = await browser.run([parsed.name === 'help' || !parsed.name ? '--help' : parsed.name, ...parsed.rest]);

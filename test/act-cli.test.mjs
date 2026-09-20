@@ -119,8 +119,8 @@ test('unknown sites return an actionable JSON error and never dispatch', t => {
   const f = fixture(t);
   const result = f.run(['打开某个未知网站'], { OPEN_SITE: 'none' });
   assert.equal(result.result.error.code, 'NEEDS_URL');
-  assert.match(result.result.error.message, /完整网址/);
-  assert.match(result.result.error.message, /jevb page act demo "打开 https:\/\/example.com"/);
+  assert.match(result.result.error.message, /full URL/);
+  assert.match(result.result.error.message, /jevb page act demo "Open https:\/\/example.com"/);
   assert.equal(result.result.error.dispatched, false);
   assert.deepEqual(f.actions(), []);
   const preview = f.run(['打开某个未知网站', '--dry-run'], { OPEN_SITE: 'none' });

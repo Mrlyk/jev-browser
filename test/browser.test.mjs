@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Browser } from '../dist/browser.js';
+import { Browser, publicBrowserError } from '../dist/browser.js';
+import { parseArgs } from '../dist/arguments.js';
 
 test('仅首次打开且明确缺少 Chrome 时初始化，安装后打开一次', async () => {
   const b = new Browser([]); const calls = [];
@@ -48,4 +49,28 @@ test('写入失败不泄露原文或 JSON 转义后的敏感值', async () => {
     assert.equal(error.message.includes('password'), false);
     return true;
   });
+});
+
+test('tab_gone uses public commands with the current session and connection', async () => {
+  const original = 'tab_gone: bound tab is gone (target ABC, last url https://www.baidu.com/s). Run `agent-browser tab new <url>` to bind a new tab, or `agent-browser tab list` to pick an existing one';
+  for (const flags of [['--auto-connect', '--pin-tab'], ['--cdp', 'ws://127.0.0.1:9222/devtools/browser']]) {
+    const b = new Browser([...flags, '--session', 'demo']);
+    b.run = async () => ({ code: 1, stdout: JSON.stringify({ success: false, error: original }), stderr: '' });
+    await assert.rejects(b.request(['snapshot']), error => {
+      assert.equal(error.code, 'BROWSER_ERROR');
+      assert.equal(error.dispatched, false);
+      assert.doesNotMatch(error.message, /agent-browser|tab new|[\p{Script=Han}]/u);
+      assert.match(error.message, /target ABC/);
+      for (const line of error.message.split('\n').slice(1)) {
+        const command = line.slice(line.indexOf('jevb ')).replace('<tab-id>', 't2').replace('<url>', 'https://example.com');
+        const parsed = parseArgs(command.split(' ').slice(1));
+        assert.equal(parsed.session, 'demo');
+        for (const flag of flags) assert.ok(parsed.globals.includes(flag) || parsed.rest.includes(flag));
+        assert.ok(['tab list', 'tab switch', 'tab create'].includes(parsed.commandPath));
+      }
+      return true;
+    });
+  }
+  assert.equal(publicBrowserError('Element text contains agent-browser', ['--session', 'demo']), 'Element text contains agent-browser');
+  assert.match(publicBrowserError('Tab t2 not found; run `agent-browser tab` to list open tabs', ['--session', 'demo']), /`jevb tab list demo`/);
 });

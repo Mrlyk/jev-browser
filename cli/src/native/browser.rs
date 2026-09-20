@@ -316,7 +316,7 @@ impl TabRef {
         if input.chars().all(|c| c.is_ascii_digit()) {
             return Err(format!(
                 "Expected a tab id like `t{}` or a label; positional integers are not accepted \
-                 (run `agent-browser tab` to list stable tab ids)",
+                 (run `jevb tab list <session>` to list stable tab ids)",
                 input
             ));
         }
@@ -438,8 +438,8 @@ fn tab_gone_error(target_id: &str, last_url: &str) -> String {
         format!(", last url {}", last_url)
     };
     format!(
-        "{} bound tab is gone (target {}{}). Run `agent-browser tab new <url>` to bind a new \
-         tab, or `agent-browser tab list` to pick an existing one",
+        "{} bound tab is gone (target {}{}). Run `jevb tab create <session> <url>` to bind a new \
+         tab, or `jevb tab list <session>` followed by `jevb tab switch <session> <tab-id>` to select an existing one",
         TAB_GONE_PREFIX, target_id, url_part
     )
 }
@@ -1519,7 +1519,7 @@ impl BrowserManager {
                     Ok(*id)
                 } else {
                     Err(format!(
-                        "Tab {} not found; run `agent-browser tab` to list open tabs",
+                        "Tab {} not found; run `jevb tab list <session>` to list open tabs",
                         format_tab_id(*id)
                     ))
                 }
@@ -1541,13 +1541,13 @@ impl BrowserManager {
                 })
                 .ok_or_else(|| {
                     format!(
-                        "No tab with label `{}`; run `agent-browser tab` to list open tabs",
+                        "No tab with label `{}`; run `jevb tab list <session>` to list open tabs",
                         name
                     )
                 }),
             TabRef::Target(target_id) => self.find_tab_id_by_target(target_id).ok_or_else(|| {
                 format!(
-                    "No tab with target id `{}`; run `agent-browser tab list --json` to \
+                    "No tab with target id `{}`; run `jevb tab list <session> --json` to \
                          list open tabs with their target ids",
                     target_id
                 )
@@ -3460,7 +3460,9 @@ mod tests {
         );
         assert!(err.contains(TARGET_A));
         assert!(err.contains("https://mine.example/checkout"));
-        assert!(err.contains("tab new"));
+        assert!(err.contains("jevb tab create <session> <url>"));
+        assert!(err.contains("jevb tab switch <session> <tab-id>"));
+        assert!(!err.contains("agent-browser"));
 
         // active_target_id is guarded the same way
         assert!(mgr

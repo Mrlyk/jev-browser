@@ -15,6 +15,6 @@ export function object(value: unknown): value is Record<string, any> {
 }
 
 export function failure(error: unknown) {
-  const e = error instanceof JevError ? error : new JevError('INTERNAL_ERROR', '内部错误；命令未完成。');
+  const e = error instanceof JevError ? error : new JevError('INTERNAL_ERROR', 'Internal error. The command did not complete.');
   return { success: false, error: { code: e.code, message: e.message, dispatched: e.dispatched } };
 }

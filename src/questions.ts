@@ -26,7 +26,7 @@ export function inputValues(instruction: string): Record<string, string> {
       add(tail.slice(split.index! + split[0].length).trim());
     }
   }
-  if (values.length > 200) throw new JevError('TOO_MANY_CANDIDATES', '输入内容候选过多，请用 --value 明确要输入的文字。');
+  if (values.length > 200) throw new JevError('TOO_MANY_CANDIDATES', 'Too many input value candidates. Specify the text with --value.');
   return Object.fromEntries(values.map((value, index) => [`v${index}`, value]));
 }
 

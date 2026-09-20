@@ -19,7 +19,7 @@ export const keys = Object.fromEntries(['Enter', 'Tab', 'Escape', 'Backspace', '
   'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Space', 'Control+a', 'Meta+a', 'Shift+Tab'].map(k => [k, k]));
 
 export function operation(value: string): Operation {
-  if (!Object.hasOwn(operations, value)) throw new JevError('UNSUPPORTED_OPERATION', `不支持的语义动作：${value}`);
+  if (!Object.hasOwn(operations, value)) throw new JevError('UNSUPPORTED_OPERATION', `Unsupported semantic action: ${value}.`);
   return value as Operation;
 }
 
@@ -38,17 +38,17 @@ export function valueOptions(op: Operation, instruction: string): Record<string,
 
 export function command(op: Operation, binding: { ref?: string; value?: string }): string[] {
   const { ref, value } = binding;
-  if (!targetless.has(op) && !/^e\d+$/.test(ref ?? '')) throw new JevError('INVALID_TARGET', '目标引用无效。');
-  if (needsValue.has(op) && value === undefined) throw new JevError('NEEDS_INPUT', '缺少明确参数，请使用 --value 或带引号的原文。');
+  if (!targetless.has(op) && !/^e\d+$/.test(ref ?? '')) throw new JevError('INVALID_TARGET', 'Invalid target reference.');
+  if (needsValue.has(op) && value === undefined) throw new JevError('NEEDS_INPUT', 'Missing action value. Use --value or quote the value in the instruction.');
   if (op === 'open') {
     let url: URL;
-    try { url = new URL(value!); } catch { throw new JevError('INVALID_VALUE', 'open 需要完整的 HTTP(S) URL。'); }
-    if (!['http:', 'https:'].includes(url.protocol)) throw new JevError('INVALID_VALUE', '语义 open 仅支持 HTTP(S)。');
+    try { url = new URL(value!); } catch { throw new JevError('INVALID_VALUE', 'open requires a full HTTP(S) URL.'); }
+    if (!['http:', 'https:'].includes(url.protocol)) throw new JevError('INVALID_VALUE', 'Semantic open only supports HTTP(S) URLs.');
     return ['open', value!];
   }
   if (op === 'scroll' || op === 'press') {
     const allowed = op === 'scroll' ? directions : keys;
-    if (!Object.hasOwn(allowed, value!)) throw new JevError('INVALID_VALUE', '按键或滚动方向不在首版支持范围内。');
+    if (!Object.hasOwn(allowed, value!)) throw new JevError('INVALID_VALUE', 'Unsupported key or scroll direction.');
     return op === 'scroll' ? ['scroll', value!, '500'] : ['press', value!];
   }
   if (targetless.has(op)) return [op];

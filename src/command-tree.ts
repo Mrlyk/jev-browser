@@ -120,22 +120,22 @@ export function normalizeCommand(args: string[]): { args: string[]; path?: strin
     const replacement = Object.entries(commandGroups).flatMap(([group, spec]) =>
       Object.entries(spec.actions).filter(([, target]) => target[0] === resource).map(([verb]) => `${group} ${verb}`))[0];
     throw new JevError('INVALID_ARGUMENT', replacement
-      ? `顶层命令 ${resource} 已移除，请使用：jev-browser ${replacement}。`
-      : `未知资源：${resource}。使用 jev-browser --help 查看资源命令。`);
+      ? `Top-level command "${resource}" has been removed. Use jevb ${replacement}.`
+      : `Unknown resource: ${resource}. Run jevb --help for available commands.`);
   }
   const group = commandGroups[resource];
   if (action === '--help' || action === '-h' || !action)
     return { args: ['help'], help: groupHelp(resource) };
   const target = Object.hasOwn(group.actions, action) ? group.actions[action] : undefined;
   if (!target) {
-    throw new JevError('INVALID_ARGUMENT', `未知 ${resource} 动作：${action}。可用动作：${Object.keys(group.actions).join(', ')}。用法：jev-browser ${resource} --help。`);
+    throw new JevError('INVALID_ARGUMENT', `Unknown ${resource} action: ${action}. Available actions: ${Object.keys(group.actions).join(', ')}. Run jevb ${resource} --help for usage.`);
   }
   const path = `${resource} ${action}`;
   if (Object.hasOwn(usages, path) && rest.some(arg => ['--help', '-h'].includes(arg)))
     return { args: ['help'], help: `用法：jev-browser ${path} ${requiresSession(args) ? '<会话名> ' : ''}${usages[path]}\n\n${group.description}。\n` + connectionHelp(resource) };
   if (((resource === 'tab' || resource === 'frame') && action === 'switch') &&
     (!rest.length || rest[0].startsWith('-')) && !rest.some(arg => ['--help', '-h'].includes(arg)))
-    throw new JevError('NEEDS_INPUT', `缺少目标。用法：jev-browser ${resource} switch <会话名> <对象>。`);
+    throw new JevError('NEEDS_INPUT', `Missing target. Usage: jevb ${resource} switch <session> <target>.`);
   return { args: [...target, ...rest], path };
 }
 

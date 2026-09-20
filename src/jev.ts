@@ -18,7 +18,7 @@ export function modelConfig(env = process.env, stored: Credentials = {}): ModelC
     transport: 'openrouter', endpoint: 'https://openrouter.ai/api/alpha/decisions',
     model: env.OPENROUTER_MODEL?.trim() || '~typesafe/jev-latest', key: openrouter,
   };
-  throw new JevError('MISSING_API_KEY', '请运行 auth login typesafe/openrouter，或设置 TYPESAFE_API_KEY / OPENROUTER_API_KEY。');
+  throw new JevError('MISSING_API_KEY', 'No API key configured. Run jevb auth login or set TYPESAFE_API_KEY / OPENROUTER_API_KEY.');
 }
 
 export function choice(instructions: string, criteria: Record<string, string>): Question {
@@ -41,7 +41,7 @@ function probability(value: unknown): value is number {
 }
 
 export function validateEvaluation(raw: unknown, questions: Record<string, Question>): Evaluation {
-  const invalid = () => new JevError('INVALID_MODEL_RESPONSE', '模型响应缺少字段、包含未知选项或非法概率。');
+  const invalid = () => new JevError('INVALID_MODEL_RESPONSE', 'Invalid model response: missing fields, unknown choices, or invalid probabilities.');
   if (!object(raw) || typeof raw.model !== 'string' || !raw.model || !object(raw.answers)) throw invalid();
   for (const [id, q] of Object.entries(questions)) {
     const a = raw.answers[id];
@@ -65,7 +65,7 @@ export function accepted(answer: Answer, thresholds = { probability: 0.85, margi
   const selected = answer.probabilities[answer.choice];
   const second = Math.max(0, ...Object.entries(answer.probabilities).filter(([k]) => k !== answer.choice).map(([, p]) => p));
   if (selected < thresholds.probability || selected - second < thresholds.margin)
-    throw new JevError('AMBIGUOUS', '模型选择未达到概率或候选差值阈值，未执行动作。');
+    throw new JevError('AMBIGUOUS', 'The model selection is below the probability or margin threshold. No action was taken.');
   return answer.choice;
 }
 
@@ -87,7 +87,7 @@ export class Jev {
   }
 
   private contextTooLarge(): JevError {
-    return new JevError('CONTEXT_TOO_LARGE', '模型输入分批后仍超过 48 KB 上限，请缩小观察范围。');
+    return new JevError('CONTEXT_TOO_LARGE', 'Model input still exceeds the 48 KB limit after batching. Narrow the scope with --scope.');
   }
 
   private async evaluateBatches(state: unknown, [id, question]: [string, Question]): Promise<Evaluation> {
@@ -132,7 +132,7 @@ export class Jev {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
         headers: { Authorization: `Bearer ${this.config.key}`, 'Content-Type': 'application/json' }, body,
       });
-      if (!response.ok) throw new JevError(`MODEL_HTTP_${response.status}`, `${this.config.transport} 返回 HTTP ${response.status}，未执行动作。`);
+      if (!response.ok) throw new JevError(`MODEL_HTTP_${response.status}`, `${this.config.transport} returned HTTP ${response.status}. No action was taken.`);
       const raw = await response.json();
       const result = validateEvaluation(raw, questions);
       this.evidence.push({ transport: this.config.transport, requestedModel: this.config.model,
@@ -141,8 +141,8 @@ export class Jev {
       return result;
     } catch (error) {
       if (error instanceof JevError) throw error;
-      if (error instanceof SyntaxError) throw new JevError('INVALID_MODEL_RESPONSE', '模型返回了无效 JSON。');
-      throw new JevError('MODEL_UNAVAILABLE', `${this.config.transport} 请求失败或超时；未切换通道。`);
+      if (error instanceof SyntaxError) throw new JevError('INVALID_MODEL_RESPONSE', 'The model returned invalid JSON.');
+      throw new JevError('MODEL_UNAVAILABLE', `${this.config.transport} request failed or timed out. No fallback provider was used.`);
     }
   }
 }

@@ -97,7 +97,7 @@ test('session inspection consumes one target and legacy entry points remain reje
   assert.throws(() => parseArgs(['session', 'inspect', 'demo', 'other']), { code: 'INVALID_ARGUMENT' });
   for (const args of [['act', 'click'], ['open', 'https://example.com'], ['close', 'demo'],
     ['click', '@e1'], ['tab', 't2'], ['tab', 'new'], ['session', 'cloase', 'demo'], ['page', 'opne'], ['constructor']])
-    assert.throws(() => parseArgs(args), error => error.code === 'INVALID_ARGUMENT' && /jev-browser/.test(error.message));
+    assert.throws(() => parseArgs(args), error => error.code === 'INVALID_ARGUMENT' && /jevb/.test(error.message) && !/[\p{Script=Han}]/u.test(error.message));
   assert.throws(() => parseArgs(['tab', 'switch', 'demo']), { code: 'NEEDS_INPUT' });
 });
 

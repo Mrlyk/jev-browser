@@ -29,13 +29,38 @@ export function coreEnv(env = process.env): NodeJS.ProcessEnv {
 
 type CoreResult = { code: number; stdout: string; stderr: string };
 
+export function publicBrowserError(message: string, args: string[]): string {
+  const sessionIndex = args.lastIndexOf('--session');
+  const session = sessionIndex >= 0 ? args[sessionIndex + 1] : '<session>';
+  const connection: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--cdp') connection.push(args[i], args[++i]);
+    else if (['--auto-connect', '--pin-tab', '--no-pin-tab'].includes(args[i])) {
+      connection.push(args[i]);
+      if (['true', 'false'].includes(args[i + 1])) connection.push(args[++i]);
+    }
+  }
+  const quote = (word: string) => /^[\w:/.-]+$/.test(word) ? word : "'" + word.replaceAll("'", "'\\''") + "'";
+  const suffix = connection.length ? ' ' + connection.map(quote).join(' ') : '';
+  const list = `jevb tab list ${session}${suffix}`;
+  if (message.startsWith('tab_gone:')) {
+    const detail = message.split('. Run `')[0];
+    return `${detail}. The bound tab is no longer available in this browser.\n` +
+      `List tabs: ${list}\n` +
+      `Select a tab: jevb tab switch ${session} <tab-id>${suffix}\n` +
+      `Open a new tab: jevb tab create ${session} <url>${suffix}`;
+  }
+  return message.replace(/`(?:agent-browser tab(?: list)?|jevb tab list <session>)( --json)?`/g,
+    (_match, json) => `\`${list}${json ?? ''}\``);
+}
+
 export class Browser {
   constructor(readonly args: string[], private env = coreEnv()) {}
 
   async run(command: string[], options: { input?: string; passthrough?: boolean; progress?: boolean; timeoutMs?: number } = {}): Promise<CoreResult> {
     const binary = corePath();
     try { await access(binary, constants.X_OK); }
-    catch { throw new JevError('CORE_NOT_INSTALLED', '当前平台执行器缺失。源码开发请运行 npm run build:core；安装包请检查平台支持。'); }
+    catch { throw new JevError('CORE_NOT_INSTALLED', 'Browser executor not found for this platform. For a source checkout, run npm run build:core; otherwise check package platform support.'); }
     return new Promise((resolve, reject) => {
       const child = spawn(binary, [...this.args, ...command], {
         env: this.env, shell: false, windowsHide: true,
@@ -52,10 +77,10 @@ export class Browser {
         if (options.passthrough || options.progress) process.stderr.write(chunk);
         else if (stderr.length < 16_000) stderr += chunk;
       });
-      child.once('error', () => { clearTimeout(timer); reject(new JevError('CORE_START_FAILED', '无法启动包内浏览器执行器。')); });
+      child.once('error', () => { clearTimeout(timer); reject(new JevError('CORE_START_FAILED', 'Failed to start the bundled browser executor.')); });
       child.once('close', code => {
         clearTimeout(timer);
-        if (timedOut || oversized || code === null) reject(new JevError('EXECUTION_UNKNOWN', '执行器被中断，结果未知；动作未重放。', true));
+        if (timedOut || oversized || code === null) reject(new JevError('EXECUTION_UNKNOWN', 'Browser executor interrupted. Execution outcome is unknown; the action was not replayed.', true));
         else resolve({ code, stdout, stderr });
       });
       if (options.input !== undefined) {
@@ -72,15 +97,15 @@ export class Browser {
     });
     let raw: any;
     try { raw = JSON.parse(result.stdout); }
-    catch { throw new JevError(options.dispatch ? 'EXECUTION_UNKNOWN' : 'INVALID_CORE_RESPONSE', '执行器没有返回完整 JSON。', !!options.dispatch); }
+    catch { throw new JevError(options.dispatch ? 'EXECUTION_UNKNOWN' : 'INVALID_CORE_RESPONSE', 'Browser executor did not return complete JSON.', !!options.dispatch); }
     if (batch && Array.isArray(raw) && raw.length === 1) raw = { ...raw[0], data: raw[0].result };
-    if (!object(raw) || typeof raw.success !== 'boolean') throw new JevError('INVALID_CORE_RESPONSE', '执行器响应结构无效。', !!options.dispatch);
+    if (!object(raw) || typeof raw.success !== 'boolean') throw new JevError('INVALID_CORE_RESPONSE', 'Invalid browser executor response.', !!options.dispatch);
     if (!raw.success || result.code !== 0) {
-      let message = typeof raw.error === 'string' ? raw.error : '浏览器命令失败。';
+      let message = typeof raw.error === 'string' ? publicBrowserError(raw.error, this.args) : 'Browser command failed.';
       const unknown = message.includes('EXECUTION_UNKNOWN:') || (!!options.dispatch && /timed? ?out|timeout|connection.*closed|websocket|disconnected/i.test(message));
       if (options.privateValue !== undefined) message = unknown
-        ? '执行结果未知；输入值与原始错误已隐藏，动作未重放。'
-        : '浏览器动作失败；输入值与原始错误已隐藏。';
+        ? 'Execution outcome is unknown. Input value and raw error were redacted; the action was not replayed.'
+        : 'Browser action failed. Input value and raw error were redacted.';
       throw new JevError(unknown ? 'EXECUTION_UNKNOWN' : 'BROWSER_ERROR', message, !!options.dispatch || unknown);
     }
     return raw.data;
@@ -94,7 +119,7 @@ export class Browser {
         process.stderr.write('首次启动：正在下载 Chrome for Testing。\n');
         await withSession('browser-install', async () => {
           const install = await this.run(['install'], { progress: true });
-          if (install.code !== 0) throw new JevError('BROWSER_INSTALL_FAILED', '浏览器下载失败，请检查网络、证书或目录权限。');
+          if (install.code !== 0) throw new JevError('BROWSER_INSTALL_FAILED', 'Browser download failed. Check the network, certificates, and directory permissions.');
         });
         result = await this.run(command);
       }

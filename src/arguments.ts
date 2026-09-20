@@ -20,10 +20,10 @@ const commands = new Set(`act help open goto navigate back forward reload read c
 
 function globalLength(args: string[], i: number, beforeCommand = true): number {
   if (args[i] === undefined) return 0;
-  if (args[i] === '--session' || args[i].startsWith('--session=')) throw new JevError('INVALID_ARGUMENT', '--session 已移除，请使用 jev-browser <资源> <动作> <会话名>，例如 jev-browser page act demo "搜索 jev" 或 jev-browser session close demo。');
-  if (args[i] === '--namespace' || args[i].startsWith('--namespace=')) throw new JevError('INVALID_ARGUMENT', 'jev-browser 使用独立命名空间，请通过动作后的会话名区分会话。');
+  if (args[i] === '--session' || args[i].startsWith('--session=')) throw new JevError('INVALID_ARGUMENT', '--session has been removed. Use jevb <resource> <action> <session>, e.g. jevb page act demo "Search for jev" or jevb session close demo.');
+  if (args[i] === '--namespace' || args[i].startsWith('--namespace=')) throw new JevError('INVALID_ARGUMENT', '--namespace is managed by jevb. Specify the session name after the action.');
   if (valued.has(args[i])) {
-    if (args[i + 1] === undefined) throw new JevError('INVALID_ARGUMENT', `${args[i]} 缺少参数。`);
+    if (args[i + 1] === undefined) throw new JevError('INVALID_ARGUMENT', `Missing value for ${args[i]}.`);
     return 2;
   }
   if (boolean.has(args[i])) return ['true', 'false'].includes(args[i + 1]) ? 2 : 1;
@@ -39,7 +39,7 @@ function validateManagement(args: string[], action: string): void {
   for (let i = 0; i < args.length; i++) {
     const n = globalLength(args, i, false);
     if (n) { i += n - 1; continue; }
-    throw new JevError('INVALID_ARGUMENT', `session ${action} 不接受额外参数。用法：jev-browser session ${action}${action === 'clear' ? ' [--json]' : ' <会话名>'}。`);
+    throw new JevError('INVALID_ARGUMENT', `session ${action} does not accept extra arguments. Usage: jevb session ${action}${action === 'clear' ? ' [--json]' : ' <session>'}.`);
   }
 }
 
@@ -48,16 +48,16 @@ function extractSession(args: string[]) {
   const help = !args[1] || args.some(arg => ['--help', '-h'].includes(arg));
   if (!scoped || help) return { args, scoped, session: undefined };
   if (args[0] === 'session' && args[1] === 'close' && args[2] === '--all')
-    throw new JevError('INVALID_ARGUMENT', 'jev-browser session close 不支持 --all，请使用 jev-browser session clear 关闭全部会话。');
+    throw new JevError('INVALID_ARGUMENT', 'session close does not support --all. Use jevb session clear to close all sessions.');
   const session = args[2];
   if (session?.startsWith('--session') || session?.startsWith('--namespace')) globalLength(args, 2, false);
-  const usage = `jev-browser ${args[0]} ${args[1]} <会话名> [对象] [选项]`;
+  const usage = `jevb ${args[0]} ${args[1]} <session> [target] [options]`;
   if (!session || session.startsWith('-'))
-    throw new JevError('NEEDS_INPUT', `请在动作后填写会话名。用法：${usage}。`);
+    throw new JevError('NEEDS_INPUT', `Missing session name after the action. Usage: ${usage}.`);
   if (!/^[a-zA-Z0-9_-]{1,48}$/.test(session))
-    throw new JevError('INVALID_SESSION', `会话名应为 1–48 个字母、数字、下划线或短横线。用法：${usage}。`);
+    throw new JevError('INVALID_SESSION', `Session names must contain 1-48 letters, digits, underscores, or hyphens. Usage: ${usage}.`);
   if (args[0] === 'auth' && (!args[3] || args[3].startsWith('-')))
-    throw new JevError('NEEDS_INPUT', '网站登录还需要已保存的账号名。用法：jev-browser auth login <会话名> <账号名>。');
+    throw new JevError('NEEDS_INPUT', 'Missing saved account name. Usage: jevb auth login <session> <account>.');
   return { args: [...args.slice(0, 2), ...args.slice(3)], scoped, session };
 }
 
@@ -94,7 +94,7 @@ export function parseArgs(args: string[]) {
       if (arg === '--value-stdin') { options.valueStdin = true; continue; }
       if (['--op', '--value', '--scope', '--min-probability', '--min-margin', '--confirm', '--cancel'].includes(arg)) {
         const value = rest[++i];
-        if (value === undefined) throw new JevError('INVALID_ARGUMENT', `${arg} 缺少参数。`);
+        if (value === undefined) throw new JevError('INVALID_ARGUMENT', `Missing value for ${arg}.`);
         if (arg === '--op') options.op = operation(value);
         if (arg === '--value') options.value = value;
         if (arg === '--scope') options.scope = value;
@@ -106,19 +106,19 @@ export function parseArgs(args: string[]) {
       }
       const n = globalLength(rest, i, false);
       if (n) { globals.push(...rest.slice(i, i + n)); i += n - 1; continue; }
-      if (arg.startsWith('-')) throw new JevError('INVALID_ARGUMENT', `未知 act 参数：${arg}`);
+      if (arg.startsWith('-')) throw new JevError('INVALID_ARGUMENT', `Unknown act option: ${arg}.`);
       words.push(arg);
     }
     options.instruction = words.join(' ').trim();
-    if (!options.instruction && !options.confirm && !options.cancel && !rest.some(arg => ['--help', '-h'].includes(arg))) throw new JevError('NEEDS_INPUT', 'act 需要一条指令或目标描述。');
+    if (!options.instruction && !options.confirm && !options.cancel && !rest.some(arg => ['--help', '-h'].includes(arg))) throw new JevError('NEEDS_INPUT', 'Missing instruction or target description for page act.');
     if ((options.confirm || options.cancel) && (options.instruction || options.op || options.value !== undefined || options.valueStdin ||
       options.scope || options.dryRun || (options.confirm && options.cancel) || rest.includes('--min-probability') || rest.includes('--min-margin')))
-      throw new JevError('INVALID_ARGUMENT', '--confirm / --cancel 只能使用原计划，不能同时修改指令、参数或阈值。');
-    if (options.valueStdin && options.value !== undefined) throw new JevError('INVALID_ARGUMENT', '--value 与 --value-stdin 不能同时使用。');
+      throw new JevError('INVALID_ARGUMENT', '--confirm / --cancel uses the saved plan and cannot be combined with a new instruction, parameters, or thresholds.');
+    if (options.valueStdin && options.value !== undefined) throw new JevError('INVALID_ARGUMENT', 'Cannot use --value and --value-stdin together.');
     for (const v of [options.probability, options.margin])
-      if (!Number.isFinite(v) || v < 0 || v > 1) throw new JevError('INVALID_ARGUMENT', '概率和差值阈值必须在 0 到 1 之间。');
+      if (!Number.isFinite(v) || v < 0 || v > 1) throw new JevError('INVALID_ARGUMENT', 'Probability and margin thresholds must be between 0 and 1.');
     if (globals.some(x => ['--max-output', '--content-boundaries', '--confirm-interactive'].includes(x)))
-      throw new JevError('INVALID_ARGUMENT', 'act 不接受截断输出、内容包裹或交互确认参数。');
+      throw new JevError('INVALID_ARGUMENT', 'page act does not support --max-output, --content-boundaries, or --confirm-interactive.');
   }
   // Native operations retain their arguments; reject legacy routing flags before dispatch.
   if (name !== 'act') {

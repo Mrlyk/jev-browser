@@ -10,7 +10,7 @@ const ttl = 5 * 60_000;
 
 function location(id: string, directory: string): string {
   if (!/^jev-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))
-    throw new JevError('INVALID_CONFIRMATION', '确认编号无效，请复制待确认信息中的完整编号。');
+    throw new JevError('INVALID_CONFIRMATION', 'Invalid confirmation ID. Copy the complete ID from the pending plan.');
   return join(directory, `${id}.json`);
 }
 
@@ -30,12 +30,12 @@ export async function takePending(id: string, session: string, directory = runti
     if ((await stat(path)).size > 4_000_000) throw Error();
     pending = JSON.parse(await readFile(path, 'utf8'));
   } catch {
-    throw new JevError('CONFIRMATION_NOT_FOUND', '待确认操作不存在、已处理或已失效，请重新发出指令。');
+    throw new JevError('CONFIRMATION_NOT_FOUND', 'Pending plan not found, already consumed, or no longer available. Run the original command again.');
   }
   if (pending.version !== 1 || pending.session !== session)
-    throw new JevError('INVALID_CONFIRMATION', '这个确认编号属于其他会话，请在 page act 后填写原来的会话名。');
+    throw new JevError('INVALID_CONFIRMATION', 'This confirmation ID belongs to another session. Use the original session name after page act.');
   await unlink(path);
   if (!Number.isFinite(pending.expiresAt) || pending.expiresAt <= Date.now())
-    throw new JevError('CONFIRMATION_EXPIRED', '这份操作计划已超过 5 分钟，请重新发出指令。');
+    throw new JevError('CONFIRMATION_EXPIRED', 'The pending plan has expired after 5 minutes. Run the original command again.');
   return pending.plan;
 }

@@ -20,7 +20,7 @@ export async function ensureLogin(): Promise<void> {
 }
 
 export async function login(provider: Provider, key: string, options: { env?: NodeJS.ProcessEnv; request?: typeof fetch } = {}) {
-  if (!validKey(key)) throw new JevError('INVALID_API_KEY', 'API Key 为空或格式无效。');
+  if (!validKey(key)) throw new JevError('INVALID_API_KEY', 'API key is empty or invalid.');
   const env = options.env ?? process.env;
   // Validate the submitted key/provider even if environment or stored credentials differ.
   const config = modelConfig({ [keyNames[provider]]: key,
@@ -31,7 +31,7 @@ export async function login(provider: Provider, key: string, options: { env?: No
     check: choice('Is the state ready?', { yes: 'Ready', no: 'Not ready' }),
   });
   if (result.answers.check.type !== 'choice' || result.answers.check.choice !== 'yes')
-    throw new JevError('MODEL_CHECK_FAILED', '登录失败，请稍后重试。');
+    throw new JevError('MODEL_CHECK_FAILED', 'Login verification failed. Try again later.');
   const durationMs = Math.round(performance.now() - start);
   await saveCredential(provider, key, env);
   return { provider, model: config.model, verified: true, durationMs, ...credentialStatus(env) };
@@ -56,7 +56,7 @@ export async function handleAuth(args: string[], json = false): Promise<boolean>
   if ((command === 'status' && rest.length !== 1) ||
     (command !== 'status' && ((provider ? !modelProvider : command !== 'login') || flags.length > 1 ||
       flags.some(flag => command !== 'login' || flag !== '--with-token'))))
-    throw new JevError('INVALID_ARGUMENT', '用法：auth login [typesafe|openrouter] [--with-token]；auth status；auth logout typesafe|openrouter。');
+    throw new JevError('INVALID_ARGUMENT', 'Usage: jevb auth login [typesafe|openrouter] [--with-token]; jevb auth status; jevb auth logout <typesafe|openrouter>.');
   let data;
   if (command === 'login') {
     const key = await readToken(flags.includes('--with-token'));

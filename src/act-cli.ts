@@ -64,7 +64,7 @@ export async function runAct(options: ActOptions, browser: Browser, context: { s
   catch (error) {
     if (!(error instanceof JevError) || error.code !== 'NEEDS_URL') throw error;
     if (context.json || !process.stdin.isTTY || !process.stdout.isTTY)
-      throw new JevError(error.code, `${error.message}\n请将示例网址替换为目标地址后重试：jevb page act ${context.session} "打开 https://example.com"${options.dryRun ? ' --dry-run' : ''}${context.json ? ' --json' : ''}`);
+      throw new JevError(error.code, `${error.message}\nReplace the example URL with your destination and retry: jevb page act ${context.session} "Open https://example.com"${options.dryRun ? ' --dry-run' : ''}${context.json ? ' --json' : ''}`);
     process.stdout.write(error.message + '\n');
     const value = await askUrl();
     if (!value) { process.stdout.write('已取消，尚未执行。\n'); return; }

@@ -34,7 +34,7 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
   const start = performance.now();
   if (options.op && options.op !== 'open' && needsValue.has(options.op) && options.value === undefined &&
     !Object.keys(['fill', 'type'].includes(options.op) ? inputValues(options.instruction) : valueOptions(options.op, options.instruction)).length)
-    throw new JevError('NEEDS_INPUT', '没有识别出要输入的内容，请用引号标明文字，或使用 --value / --value-stdin。');
+    throw new JevError('NEEDS_INPUT', 'No input value found. Quote the text or provide --value / --value-stdin.');
   const before = await observe(browser, options.scope);
   const snapshotMs = Math.round(performance.now() - start);
   const built = buildQuestions(options, before);
@@ -42,40 +42,40 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
   const uncertainties: Uncertainty[] = [];
   const pick = (id: string, subject: string): string => {
     const raw = answers[id];
-    if (!raw) throw new JevError('NO_MATCH', `没有找到可用于${subject}的候选，请缩小范围或补充描述。`);
+    if (!raw) throw new JevError('NO_MATCH', `No candidates available for "${id}". Narrow the scope or provide a more specific instruction.`);
     const answer = asChoice(raw);
     const labels = built.questions[id].criteria;
     if (['none', 'ambiguous'].includes(answer.choice)) {
       const alternatives = Object.entries(answer.probabilities).filter(([key, p]) => !['none', 'ambiguous'].includes(key) && p > 0)
         .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key]) => labels[key]);
       throw new JevError(answer.choice === 'none' ? 'NO_MATCH' : 'AMBIGUOUS',
-        `无法确定${subject}，尚未执行。${alternatives.length ? `可能的选项：${alternatives.join('；')}。` : ''}请补充目标或内容描述后重试。`);
+        `Could not resolve "${id}". No action was taken.${alternatives.length ? ` Possible matches: ${alternatives.join('; ')}.` : ''} Provide a more specific instruction and retry.`);
     }
     const issue = uncertainty(answer, { subject, labels }, options);
     if (issue) uncertainties.push(issue);
     return answer.choice;
   };
   const intent = options.op ?? pick('operation', '要执行的动作');
-  if (intent === 'multi_step') throw new JevError('MULTI_STEP_UNSUPPORTED', '这条指令包含多个独立操作，请拆开调用；同一输入框的输入和回车可以一起完成。');
-  if (intent === 'unsupported') throw new JevError('UNSUPPORTED_OPERATION', '这条指令禁止执行或不属于支持的浏览器操作，尚未执行。');
+  if (intent === 'multi_step') throw new JevError('MULTI_STEP_UNSUPPORTED', 'Multiple independent actions are not supported. Split them into separate commands; typing and submitting the same input can be combined.');
+  if (intent === 'unsupported') throw new JevError('UNSUPPORTED_OPERATION', 'The instruction prohibits execution or does not describe a supported browser action. No action was taken.');
   const clear = intent === 'input' ? pick('clear', '是否清空原有内容') === 'true' : intent === 'fill';
   const submit = intent === 'input' ? pick('submit', '是否输入后回车提交') === 'true' : false;
   const op = intent === 'input' ? (clear ? 'fill' : 'type') : operation(intent);
-  if (options.valueStdin && !['fill', 'type', 'select'].includes(op)) throw new JevError('INVALID_VALUE', '--value-stdin 仅支持输入或选择选项。');
-  if (!needsValue.has(op) && options.value !== undefined) throw new JevError('INVALID_VALUE', '该动作不接受 --value。');
+  if (options.valueStdin && !['fill', 'type', 'select'].includes(op)) throw new JevError('INVALID_VALUE', '--value-stdin is only supported for fill, type, and select.');
+  if (!needsValue.has(op) && options.value !== undefined) throw new JevError('INVALID_VALUE', 'This action does not accept --value.');
   let target: Candidate | undefined;
   let candidates: Candidate[] = [];
   if (!targetless.has(op)) {
     candidates = candidatesFor(before, op);
     const ref = pick(intent === 'input' ? 'input_target' : 'target', intent === 'input' ? '要使用的输入框' : '要操作的目标');
     target = candidates.find(c => c.ref === ref);
-    if (!target) throw new JevError('INVALID_TARGET', '模型选择的目标不能执行该操作，尚未执行。');
+    if (!target) throw new JevError('INVALID_TARGET', 'The selected target does not support this action. No action was taken.');
   }
   let value = options.value;
   if (needsValue.has(op) && value === undefined) {
     const id = !options.op && op === 'open' ? 'url' : !options.op && op === 'press' ? 'key' : !options.op && op === 'scroll' ? 'direction' : 'value';
     if (op === 'open' && ['none', 'ambiguous'].includes(asChoice(answers[id]).choice))
-      throw new JevError('NEEDS_URL', '暂时无法确定要打开的网站，尚未执行。请提供以 https:// 或 http:// 开头的完整网址。');
+      throw new JevError('NEEDS_URL', 'Could not resolve the destination. Provide a full URL starting with https:// or http://. No action was taken.');
     const selected = pick(id, op === 'open' ? '要打开的网站或网址' : '要输入或使用的内容');
     value = op === 'press' || op === 'scroll' ? selected : op === 'open' && Object.hasOwn(sites, selected)
       ? sites[selected].url : built.questions[id].criteria[selected];
@@ -92,13 +92,13 @@ export async function validatePlan(plan: Plan, browser: Browser): Promise<void> 
   const current = await observe(browser, plan.scope);
   if (plan.target) assertFresh(plan.before, current, plan.target);
   else if (plan.before.origin !== current.origin || plan.before.pageId !== current.pageId || plan.before.frameId !== current.frameId)
-    throw new JevError('STALE_TARGET', '当前页面已变化，请重新发出指令。');
+    throw new JevError('STALE_TARGET', 'The page has changed. Run the command again to inspect the current page.');
   if (plan.target && plan.target.role.toLowerCase() !== 'statictext') {
     if ((await browser.request(['is', 'visible', `@${plan.target.ref}`]))?.visible !== true)
-      throw new JevError('STALE_TARGET', '目标当前不可见，请重新发出指令。');
+      throw new JevError('STALE_TARGET', 'The target is no longer visible. Inspect the page before retrying.');
     if (!['get_text', 'scrollintoview'].includes(plan.operation) &&
       (await browser.request(['is', 'enabled', `@${plan.target.ref}`]))?.enabled !== true)
-      throw new JevError('STALE_TARGET', '目标当前不可用，请重新发出指令。');
+      throw new JevError('STALE_TARGET', 'The target is no longer enabled. Inspect the page before retrying.');
   }
 }
 
@@ -141,7 +141,7 @@ export async function executePlan(plan: Plan, browser: Browser, confirmed = fals
     return planResult(plan, 'executed', result);
   } catch (error) {
     if (dispatched && error instanceof JevError)
-      throw new JevError(error.code, plan.submit ? '输入或提交过程未完成；可能已填入文字，请检查页面后再操作，不要直接重试。' : error.message, true);
+      throw new JevError(error.code, plan.submit ? 'Input or submission did not complete. Text may already have been entered. Check the page before retrying.' : error.message, true);
     throw error;
   }
 }
