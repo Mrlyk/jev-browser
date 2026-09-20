@@ -18,7 +18,7 @@ Use this CLI as the browser execution tool for the user's task. You plan the wor
 1. Choose a unique session for the task. Place its name immediately after the action, replacing `task-demo` below; never use `--session` or rely on a default. Global utilities such as `session list`, model `auth login`, and `browser install` need no session; serialize its operations.
 2. Use `page act <session> --op` when you know the action, and `--value` for an exact known value. Otherwise give `page act` one instruction. Independent action, target, input, clear, and submit questions run together; entering text and submitting that field can form one operation. Other multi-step tasks must be split by the caller.
 3. Inspect `--json` results and the exit code, then verify the expected page state before the next step. A reliable current selector can use an atomic command without a model call.
-4. Close the task's own session when done. For CDP, browser-launch restrictions, or login reuse, read [sessions-auth.md](references/sessions-auth.md).
+4. Close the task's own session with `session close <session>` when done. Use `session clear` only when the task calls for closing all running sessions; it takes no session name. `session close --all` is rejected. For session cleanup, CDP, browser-launch restrictions, or login reuse, read [sessions-auth.md](references/sessions-auth.md).
 
 ```bash
 jev-browser page open task-demo --json https://example.com

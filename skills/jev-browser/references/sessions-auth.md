@@ -33,6 +33,15 @@ jev-browser session close task-demo --json
 
 A session lock covers observation through execution. It serializes jev-browser callers but does not prevent a human or another tool from changing a CDP browser. `SESSION_BUSY` is a conflict, not permission to remove the lock or take over another task.
 
+For a task that calls for closing all running sessions, use:
+
+```bash
+jev-browser session list --json
+jev-browser session clear --json
+```
+
+`session clear` takes no session name and replaces `session close --all`, which is rejected. It closes every running session in the current runtime directory, including sessions from other tasks. Routine task cleanup uses `session close <session>`. JSON output includes `data.closed` (a count) and `data.sessions` (closed names); failures appear in `data.failed` when present. Clearing an empty runtime succeeds with a count of zero. Closing sessions preserves deliberately saved login state; attached Chrome browsers are disconnected from control.
+
 ## Connect to a browser
 
 ```bash
@@ -79,7 +88,7 @@ jev-browser state save task-demo --json './auth-state.json'
 jev-browser page open task-demo --state './auth-state.json' --json https://example.com
 ```
 
-State files and dedicated `--profile` directories can contain credentials and account data. Use the task's intended identity, keep these files out of commits and model prompts, and close only the session owned by the task. Closing a session does not imply deletion of deliberately persisted login data.
+State files and dedicated `--profile` directories can contain credentials and account data. Use the task's intended identity, keep these files out of commits and model prompts, and limit routine cleanup to the session owned by the task. Closing a session does not imply deletion of deliberately persisted login data.
 
 ## Configuration boundaries
 

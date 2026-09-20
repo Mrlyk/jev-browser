@@ -2,6 +2,8 @@
 
 Use for command syntax and choosing between semantic and deterministic actions. Examples assume an already selected, task-owned session and matching controls; replace URLs, selectors, labels, and observed refs. This is a curated adaptation of agent-browser v0.38.1's core command guide for jev-browser.
 
+Use `--json` for machine-readable operation results and check the exit code as well. This flag controls output formatting and does not itself invoke a model. Help and version output remain text, and result/error fields vary by command; do not assume every response uses the `page act` schema. For listing, closing, or clearing sessions, read [sessions-auth.md](sessions-auth.md).
+
 ## Semantic actions
 
 ```bash
