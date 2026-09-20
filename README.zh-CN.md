@@ -173,14 +173,26 @@ printf '%s' "$TEST_PASSWORD" | jev-browser page act demo --op fill '密码输入
 源码开发需要 Node.js 22+ 和 Rust stable。在仓库根目录运行：
 
 ```bash
-npm ci
-npm run build:core
-npm run build
-npm test
-node dist/cli.js --help
+npm run dev
 ```
 
-日常修改 `src/` 下的 TypeScript，只需重新运行 `npm run build`；修改 `cli/` 中的 Rust 代码或更新上游后，再运行 `npm run build:core`。
+这一个命令会安装锁定的开发依赖、构建 Rust 执行器和 TypeScript，再把当前仓库链接到全局的 `jevb` 与 `jev-browser`。任何准备步骤失败都会停止，不替换全局命令。修改源码后重新运行 `npm run dev` 即可更新开发版本。
+
+之后可在任意目录直接测试：
+
+```bash
+jevb page open demo https://www.baidu.com --headed
+jevb page act demo "搜索 jev"
+jevb session close demo
+```
+
+恢复正式安装时，使用同一套 Node/npm 执行下面的命令，会覆盖开发链接，仓库文件保留：
+
+```bash
+npm install -g jev-browser-cli@latest
+```
+
+`npm test` 执行功能回归。仅需重新编译 TypeScript 时也可运行 `npm run build`。
 
 打包：
 

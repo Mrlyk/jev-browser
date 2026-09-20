@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsc && node scripts/finish-build.mjs",
     "build:core": "node scripts/build-core.mjs",
-    "dev": "npm run build && node dist/cli.js",
+    "dev": "npm ci --no-audit --no-fund && npm run build:core && npm run build && npm link --ignore-scripts --no-audit --no-fund",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:smoke": "npm run build && node test/smoke.mjs",
     "test:live": "npm run build && node test/live.mjs",

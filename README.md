@@ -173,14 +173,26 @@ For `page act demo 'Search for jev'`, independent questions share one request, a
 Requires Node.js 22+ and stable Rust. From the repository root:
 
 ```bash
-npm ci
-npm run build:core
-npm run build
-npm test
-node dist/cli.js --help
+npm run dev
 ```
 
-For TypeScript changes in `src/`, rerun `npm run build`. Rebuild the executor with `npm run build:core` after changing Rust code in `cli/` or updating upstream source.
+This installs the locked development dependencies, builds Rust and TypeScript, and links this checkout globally as both `jevb` and `jev-browser`. A failed preparation step stops before replacing the global commands. Rerun `npm run dev` after source changes.
+
+Then test from any directory:
+
+```bash
+jevb page open demo https://www.baidu.com --headed
+jevb page act demo "Search for jev"
+jevb session close demo
+```
+
+To return to a released installation, use the same Node/npm installation. This replaces the development link and leaves the checkout intact:
+
+```bash
+npm install -g jev-browser-cli@latest
+```
+
+Run `npm test` for functional regression tests, or `npm run build` to rebuild only TypeScript.
 
 Create a local package:
 
