@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Browser } from './browser.js';
 import { parseArgs } from './arguments.js';
-import { resourceOverview } from './command-tree.js';
+import { resourceOverview, browserOptionsHelp, connectionHelp } from './command-tree.js';
 import { runAct } from './act-cli.js';
 import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
@@ -33,7 +33,7 @@ ${resourceOverview()}
 
 page act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
      --min-probability <0..1>（默认 0.85）、--min-margin <0..1>（默认 0.20）
-全局：--headed、--cdp <port|url>、--json
+${browserOptionsHelp}
 会话：浏览器操作必须在动作后填写会话名，例如 page act demo "搜索 jev"。
 查看参数：jev-browser <资源> <动作> --help
 命令别名：jevb 与 jev-browser 等价；仅支持资源命令。
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     const action = parsed.commandPath?.split(' ')[1];
     const nativeCommand = `${parsed.name}${action && parsed.rest[0] === action ? ` ${action}` : ''}`;
     const text = parsed.commandPath ? result.stdout.replaceAll(`agent-browser ${nativeCommand}`, `jev-browser ${parsed.commandPath}${parsed.sessionRequired ? ' <会话名>' : ''}`) : result.stdout;
-    process.stdout.write(text.replaceAll('agent-browser', 'jev-browser'));
+    process.stdout.write(text.replaceAll('agent-browser', 'jev-browser') + connectionHelp(parsed.commandPath?.split(' ')[0] ?? ''));
     process.stderr.write(result.stderr);
     process.exitCode = result.code;
     return;

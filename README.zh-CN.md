@@ -92,6 +92,28 @@ jevb session close demo
 
 完整命令分组见 `jevb --help`。更多示例见[命令指南](skills/jev-browser/references/commands.md)，页面引用和会话复用见[快照指南](skills/jev-browser/references/snapshot-refs.md)、[会话指南](skills/jev-browser/references/sessions-auth.md)。
 
+### 浏览器连接参数
+
+| 参数 | 作用 | 示例 |
+| --- | --- | --- |
+| `--auto-connect` | 自动连接已开启远程调试的本机 Chrome，复用标签页和登录状态 | `jevb tab list mychrome --auto-connect` |
+| `--cdp <port\|url>` | 连接指定调试端口或 CDP 地址，与 `--auto-connect` 二选一 | `jevb page snapshot mychrome --cdp 9222` |
+| `--pin-tab` | 固定会话选中的标签页；标签页关闭后报错，避免切到其他页面 | `jevb page snapshot mychrome --auto-connect --pin-tab` |
+| `--no-pin-tab` | 取消固定标签页 | `jevb page snapshot mychrome --auto-connect --no-pin-tab` |
+| `--headed` | 启动本地浏览器时显示窗口；连接已有浏览器无需此参数 | `jevb page open demo https://example.com --headed` |
+| `--json` | 以 JSON 输出操作结果，便于脚本读取 | `jevb tab list mychrome --auto-connect --json` |
+
+连接日常使用的 Chrome（144+）时，先在地址栏打开 `chrome://inspect/#remote-debugging` 并启用远程调试，连接时允许 Chrome 的授权请求：
+
+```bash
+jevb tab list mychrome --auto-connect
+jevb tab switch mychrome t2 --auto-connect
+jevb page snapshot mychrome --auto-connect --pin-tab
+jevb page act mychrome "搜索 jev" --auto-connect --pin-tab
+```
+
+将 `t2` 替换为列表中的目标标签页 ID，后续保持同一会话名。以上参数也可通过 `jevb help`、`jevb help browser connect`、`jevb help page act` 或 `jevb help tab list` 查看。
+
 ### 预览与确认
 
 先看计划，不执行动作：

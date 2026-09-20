@@ -81,11 +81,33 @@ const usages: Record<string, string> = {
   'skill path': '<名称>', 'profile list': '[--json]', 'server start': '[--tools <profiles>]',
 };
 
+export const browserOptionsHelp = `浏览器连接参数：
+  --auto-connect       自动连接已开启远程调试的本机 Chrome，复用标签页和登录状态
+  --cdp <port|url>      连接指定调试端口或 CDP 地址；与 --auto-connect 二选一
+  --pin-tab            固定会话选中的标签页；标签页关闭后报错，避免切到其他页面
+  --no-pin-tab         取消固定标签页
+  --headed             启动本地浏览器时显示窗口；连接已有浏览器无需此参数
+  --json               以 JSON 输出操作结果，便于脚本读取
+
+连接日常使用的 Chrome（144+）：
+  先在 chrome://inspect/#remote-debugging 启用远程调试，连接时在 Chrome 中允许授权。
+  jevb tab list mychrome --auto-connect
+  jevb tab switch mychrome t2 --auto-connect
+  jevb page snapshot mychrome --auto-connect --pin-tab
+  jevb page act mychrome "搜索 jev" --auto-connect --pin-tab
+  t2 替换为 tab list 返回的标签页 ID；后续使用同一会话名。
+  已有固定调试端口时：jevb browser connect mychrome 9222
+`;
+
+export function connectionHelp(resource: string): string {
+  return ['browser', 'page', 'tab'].includes(resource) ? `\n${browserOptionsHelp}` : '';
+}
+
 export function groupHelp(name: string): string {
   const group = commandGroups[name];
   return `用法：jev-browser ${name} <动作> [会话名] [对象] [选项]\n\n${group.description}\n\n动作：\n` +
     Object.keys(group.actions).map(action => `  ${action}`).join('\n') +
-    `\n\n需要浏览器会话的动作使用：jev-browser ${name} <动作> <会话名> [对象] [选项]。\n使用 jev-browser ${name} <动作> --help 查看参数。\n`;
+    `\n\n需要浏览器会话的动作使用：jev-browser ${name} <动作> <会话名> [对象] [选项]。\n使用 jev-browser ${name} <动作> --help 查看参数。\n` + connectionHelp(name);
 }
 
 export function normalizeCommand(args: string[]): { args: string[]; path?: string; help?: string } {
@@ -110,7 +132,7 @@ export function normalizeCommand(args: string[]): { args: string[]; path?: strin
   }
   const path = `${resource} ${action}`;
   if (Object.hasOwn(usages, path) && rest.some(arg => ['--help', '-h'].includes(arg)))
-    return { args: ['help'], help: `用法：jev-browser ${path} ${requiresSession(args) ? '<会话名> ' : ''}${usages[path]}\n\n${group.description}。\n` };
+    return { args: ['help'], help: `用法：jev-browser ${path} ${requiresSession(args) ? '<会话名> ' : ''}${usages[path]}\n\n${group.description}。\n` + connectionHelp(resource) };
   if (((resource === 'tab' || resource === 'frame') && action === 'switch') &&
     (!rest.length || rest[0].startsWith('-')) && !rest.some(arg => ['--help', '-h'].includes(arg)))
     throw new JevError('NEEDS_INPUT', `缺少目标。用法：jev-browser ${resource} switch <会话名> <对象>。`);

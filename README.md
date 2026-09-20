@@ -94,6 +94,28 @@ Run `jevb --help` for all command groups. See the [command guide](skills/jev-bro
 
 For refs and session reuse, read the [snapshot guide](skills/jev-browser/references/snapshot-refs.md) and [session guide](skills/jev-browser/references/sessions-auth.md).
 
+### Browser connection options
+
+| Option | Purpose | Example |
+| --- | --- | --- |
+| `--auto-connect` | Connect to local Chrome with remote debugging enabled, reusing tabs and login state | `jevb tab list mychrome --auto-connect` |
+| `--cdp <port\|url>` | Connect to a specific debug port or CDP address; cannot be combined with `--auto-connect` | `jevb page snapshot mychrome --cdp 9222` |
+| `--pin-tab` | Keep the session on its selected tab; fail if that tab closes instead of switching to another | `jevb page snapshot mychrome --auto-connect --pin-tab` |
+| `--no-pin-tab` | Stop pinning the selected tab | `jevb page snapshot mychrome --auto-connect --no-pin-tab` |
+| `--headed` | Show the window when launching a local browser; unnecessary when attaching to an existing browser | `jevb page open demo https://example.com --headed` |
+| `--json` | Output operation results as JSON for scripts | `jevb tab list mychrome --auto-connect --json` |
+
+To connect to your everyday Chrome (144+), open `chrome://inspect/#remote-debugging`, enable remote debugging, and allow Chrome's authorization prompt when connecting:
+
+```bash
+jevb tab list mychrome --auto-connect
+jevb tab switch mychrome t2 --auto-connect
+jevb page snapshot mychrome --auto-connect --pin-tab
+jevb page act mychrome "Search for jev" --auto-connect --pin-tab
+```
+
+Replace `t2` with the target tab ID from the list and keep using the same session name. These options also appear in `jevb help`, `jevb help browser connect`, `jevb help page act`, and `jevb help tab list`.
+
 ### Preview and confirm
 
 Inspect a plan without executing it:
