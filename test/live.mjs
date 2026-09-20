@@ -60,7 +60,7 @@ try {
       const record = { name: item.name, passed: false };
       await browser.request(['open', `http://127.0.0.1:${server.address().port}${item.path ?? '/'}`]);
       try {
-        const result = await act({ probability: 0.85, margin: 0.2, ...item.options }, browser, jev);
+        const result = await act({ probability: 0.8, margin: 0.2, ...item.options }, browser, jev);
         record.result = result;
         assert.equal(item.error, undefined, `应拒绝执行：${item.error}`);
         assert.equal(result.data.status, item.options.dryRun ? 'resolved' : 'executed');

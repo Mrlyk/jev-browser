@@ -88,7 +88,7 @@ test('自然语言点击大页面保留目标，最终相近概率仍需确认',
     commands.push(args);
     return args[0] === 'snapshot' ? page : { visible: true, enabled: true };
   } };
-  const plan = await prepareAct({ instruction: '点击Jev百度百科', probability: 0.85, margin: 0.2 }, browser, s.jev);
+  const plan = await prepareAct({ instruction: '点击Jev百度百科', probability: 0.8, margin: 0.2 }, browser, s.jev);
   assert.equal(plan.target.ref, 'e254');
   assert.equal(plan.meta.candidateCount, 254);
   assert.equal(plan.meta.modelRequests, s.requests.length);

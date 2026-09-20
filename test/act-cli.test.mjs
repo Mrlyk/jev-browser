@@ -27,7 +27,7 @@ function fixture(t) {
       const answers = Object.fromEntries(Object.entries(request.questions).map(([id, q]) => {
         if (q.type === 'noul') return [id, { type: 'noul', noul: .99 }];
         const chosen = id === 'operation' ? (process.env.OPEN_SITE ? 'open' : 'input') : id === 'url' ? (process.env.OPEN_SITE || 'none') : ['target', 'input_target'].includes(id) ? (process.env.TARGET_CHOICE || 'e1') : id === 'value' && q.criteria.v0 !== undefined ? 'v0' : 'none';
-        const p = ['target', 'input_target'].includes(id) ? Number(process.env.TARGET_PROBABILITY || .8) : 1;
+        const p = ['target', 'input_target'].includes(id) ? Number(process.env.TARGET_PROBABILITY || .799) : 1;
         return [id, { type: 'choice', choice: chosen, confidence: p,
           probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === chosen ? p : k === (chosen === 'e1' ? 'none' : 'e1') ? 1-p : 0])) }];
       }));
@@ -62,7 +62,7 @@ test('JSON CLI exposes a concrete plan, confirms once without a model call, and 
   const pending = f.run(['搜索 jev']);
   assert.equal(pending.status, 2, pending.stdout + pending.stderr);
   assert.equal(pending.result.data.status, 'needs_confirmation');
-  assert.equal(pending.result.meta.decisions[0].answers.input_target.probabilities.e1, .8);
+  assert.equal(pending.result.meta.decisions[0].answers.input_target.probabilities.e1, .799);
   assert.equal(pending.result.data.plan.value, 'jev');
   assert.equal(pending.result.data.plan.submit, true);
   assert.match(pending.result.confirmation.confirmCommand, /page act demo --confirm jev-/);
@@ -160,11 +160,11 @@ test('non-interactive never prompts or saves pending; non-TTY agents retain conf
 
 test('non-interactive executes confident plans and returns zero for resolved previews', t => {
   const f = fixture(t);
-  const preview = f.run(['搜索 jev', '--dry-run', '--non-interactive'], { TARGET_PROBABILITY: '1' });
+  const preview = f.run(['搜索 jev', '--dry-run', '--non-interactive'], { TARGET_PROBABILITY: '.8' });
   assert.equal(preview.status, 0, preview.stderr);
   assert.equal(preview.result.data.status, 'resolved');
   assert.deepEqual(f.actions(), []);
-  const result = f.run(['搜索 jev', '--non-interactive'], { TARGET_PROBABILITY: '1' });
+  const result = f.run(['搜索 jev', '--non-interactive'], { TARGET_PROBABILITY: '.8' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.result.data.status, 'executed');
   assert.equal(f.actions().length, 3);

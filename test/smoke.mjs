@@ -32,7 +32,7 @@ function modelFor(targetDescription) {
 
 async function perform(options, predicate) {
   process.stderr.write(`smoke: ${options.op}${options.dryRun ? ' dry-run' : ''}\n`);
-  const result = await act({ instruction: '测试目标', probability: 0.85, margin: 0.2, ...options }, browser, modelFor(predicate));
+  const result = await act({ instruction: '测试目标', probability: 0.8, margin: 0.2, ...options }, browser, modelFor(predicate));
   reports.push({ operation: options.op, status: result.data.status, timings: result.meta.timings });
   return result;
 }

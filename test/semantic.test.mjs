@@ -12,7 +12,7 @@ const data = () => ({ origin: 'http://localhost/', pageId: 'p1', frameId: null,
   snapshot: '- document\n  - region "入住信息":\n    - button "确认" [ref=e1]\n    - textbox "姓名" [ref=e2]\n  - region "发票信息":\n    - button "确认" [ref=e3]',
   refs: { e1: { role: 'button', name: '确认', backendNodeId: 1 }, e2: { role: 'textbox', name: '姓名', backendNodeId: 2 }, e3: { role: 'button', name: '确认', backendNodeId: 3 } },
 });
-const options = (extra = {}) => ({ instruction: '入住信息的确认按钮', op: 'click', probability: 0.85, margin: 0.2, ...extra });
+const options = (extra = {}) => ({ instruction: '入住信息的确认按钮', op: 'click', probability: 0.8, margin: 0.2, ...extra });
 function setup(selections, changed) {
   const requests = [], commands = [];
   let snapshots = 0;

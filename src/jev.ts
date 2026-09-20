@@ -61,7 +61,7 @@ export function validateEvaluation(raw: unknown, questions: Record<string, Quest
   return raw as Evaluation;
 }
 
-export function accepted(answer: Answer, thresholds = { probability: 0.85, margin: 0.2 }): string {
+export function accepted(answer: Answer, thresholds = { probability: 0.8, margin: 0.2 }): string {
   const selected = answer.probabilities[answer.choice];
   const second = Math.max(0, ...Object.entries(answer.probabilities).filter(([k]) => k !== answer.choice).map(([, p]) => p));
   if (selected < thresholds.probability || selected - second < thresholds.margin)

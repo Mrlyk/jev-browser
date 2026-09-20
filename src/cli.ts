@@ -33,7 +33,7 @@ ${resourceOverview()}
 
 page act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
      --non-interactive（不提示交互、不保存待确认计划）
-     --min-probability <0..1>（默认 0.85）、--min-margin <0..1>（默认 0.20）
+     --min-probability <0..1>（默认 0.80）、--min-margin <0..1>（默认 0.20）
 page act 退出码：0 完成或预览/取消；1 错误；2 待确认；3 执行未知或已派发后出错。
 ${browserOptionsHelp}
 会话：浏览器操作必须在动作后填写会话名，例如 page act demo "搜索 jev"。

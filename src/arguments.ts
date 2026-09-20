@@ -84,7 +84,7 @@ export function parseArgs(args: string[]) {
   if (!showingHelp && normalized.path === 'session clear') validateManagement(selected.args.slice(2), 'clear');
   if (!showingHelp && normalized.path === 'session close') validateManagement(rest, 'close');
   if (!showingHelp && name === 'session' && rest[0] === 'info') validateManagement(rest.slice(1), 'inspect');
-  const options: ActOptions = { instruction: '', probability: 0.85, margin: 0.2 };
+  const options: ActOptions = { instruction: '', probability: 0.8, margin: 0.2 };
   if (name === 'act' && !rest.some(arg => ['--help', '-h'].includes(arg))) {
     const words: string[] = [];
     for (let i = 0; i < rest.length; i++) {
