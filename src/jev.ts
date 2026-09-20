@@ -74,12 +74,58 @@ export class Jev {
   constructor(readonly config: ModelConfig, private request: typeof fetch = fetch) {}
 
   async evaluate(state: unknown, questions: Record<string, Question>): Promise<Evaluation> {
-    for (const q of Object.values(questions)) {
-      if (Object.keys(q.criteria).length > 255) throw new JevError('TOO_MANY_CANDIDATES', '候选超过 255 个，请使用 --scope 缩小范围。');
-    }
+    const entries = Object.entries(questions);
     const body = JSON.stringify({ model: this.config.model, state, questions });
-    // Conservative byte budget: no silent truncation and no guessed token count.
-    if (Buffer.byteLength(body) > 48_000) throw new JevError('CONTEXT_TOO_LARGE', '模型输入超过首版 48 KB 上限，请缩小观察范围。');
+    if (entries.every(([, q]) => Object.keys(q.criteria).length <= 255) && Buffer.byteLength(body) <= 48_000)
+      return this.send(body, questions);
+    if (entries.length > 1) {
+      const results = await Promise.all(entries.map(([id, q]) => this.evaluate(state, { [id]: q })));
+      return { model: results[0].model, answers: Object.assign({}, ...results.map(r => r.answers)) };
+    }
+    if (!entries.length || entries[0][1].type !== 'choice') throw this.contextTooLarge();
+    return this.evaluateBatches(state, entries[0]);
+  }
+
+  private contextTooLarge(): JevError {
+    return new JevError('CONTEXT_TOO_LARGE', '模型输入分批后仍超过 48 KB 上限，请缩小观察范围。');
+  }
+
+  private async evaluateBatches(state: unknown, [id, question]: [string, Question]): Promise<Evaluation> {
+    const escapes = Object.fromEntries(Object.entries(question.criteria).filter(([key]) => ['none', 'ambiguous'].includes(key)));
+    const candidates = Object.entries(question.criteria).filter(([key]) => !Object.hasOwn(escapes, key));
+    const batches: Question[] = [];
+    let criteria = { ...escapes };
+    const fits = (values: Record<string, string>) => Object.keys(values).length <= 255 &&
+      Buffer.byteLength(JSON.stringify({ model: this.config.model, state,
+        questions: { [id]: { ...question, criteria: values } } })) <= 48_000;
+    for (const [key, label] of candidates) {
+      if (!fits({ ...criteria, [key]: label })) {
+        if (Object.keys(criteria).length === Object.keys(escapes).length) throw this.contextTooLarge();
+        batches.push({ ...question, criteria });
+        criteria = { ...escapes };
+        if (!fits({ ...criteria, [key]: label })) throw this.contextTooLarge();
+      }
+      criteria[key] = label;
+    }
+    if (!candidates.length) throw this.contextTooLarge();
+    batches.push({ ...question, criteria });
+    // Keep runners-up so close alternatives survive into the common comparison.
+    // Probabilities from separate Choice distributions must not be compared directly.
+    const finalists: Record<string, string> = { ...escapes };
+    for (let offset = 0; offset < batches.length; offset += 4) {
+      const results = await Promise.all(batches.slice(offset, offset + 4).map(q => this.evaluate(state, { [id]: q })));
+      for (const result of results) {
+        const answer = asChoice(result.answers[id]);
+        const ranked = Object.entries(answer.probabilities).filter(([key]) => !Object.hasOwn(escapes, key))
+          .sort((a, b) => b[1] - a[1]).slice(0, 2);
+        for (const [key] of ranked) finalists[key] = question.criteria[key];
+      }
+    }
+    if (Object.keys(finalists).length >= Object.keys(question.criteria).length) throw this.contextTooLarge();
+    return this.evaluate(state, { [id]: { ...question, criteria: finalists } });
+  }
+
+  private async send(body: string, questions: Record<string, Question>): Promise<Evaluation> {
     const start = performance.now();
     try {
       const response = await this.request(this.config.endpoint, {

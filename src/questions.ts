@@ -40,7 +40,7 @@ export function describe(candidate: Candidate): string {
 function optionalCandidates(before: Snapshot, op: Parameters<typeof candidatesFor>[1]): Candidate[] {
   try { return candidatesFor(before, op); }
   catch (error) {
-    if (error instanceof JevError && ['NO_MATCH', 'TOO_MANY_CANDIDATES'].includes(error.code)) return [];
+    if (error instanceof JevError && error.code === 'NO_MATCH') return [];
     throw error;
   }
 }

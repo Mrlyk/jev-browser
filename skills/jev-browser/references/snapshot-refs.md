@@ -34,7 +34,7 @@ Before using a stored ref after navigation, tab/frame changes, or a rerender, ob
 
 - A target absent from the current observation cannot be selected reliably. Wait for a loading result or switch to the correct tab/frame before trying again.
 - Repeated labels need their region or business context. The current CSS scope must come from actual page/code evidence; `--scope` does not accept natural language or an `@eN` ref.
-- More than 253 target candidates produces `TOO_MANY_CANDIDATES`; an oversized model request produces `CONTEXT_TOO_LARGE`. Narrow the scope instead of silently dropping the end of the candidate list.
+- Large candidate sets are evaluated in batches of at most 253 targets plus `none` and `ambiguous`. Each batch's top two targets enter a common comparison; final probabilities drive the existing confirmation thresholds. Requests also split by byte size. `CONTEXT_TOO_LARGE` means the shared context or remaining candidates cannot fit after splitting; narrow the verified scope.
 - Native date controls are selected as whole `Date`/`DateTime` inputs. `fill` excludes their internal year/month/day spinbuttons; pass an explicit ISO date to the whole field.
 - `get_text` can select a named container or a `StaticText` node. Name the container to read its complete text, or describe a specific text node for a narrower reading.
 

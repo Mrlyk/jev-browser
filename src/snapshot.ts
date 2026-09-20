@@ -41,7 +41,6 @@ export function candidatesFor(observation: Snapshot, op: Operation): Candidate[]
     !(op === 'fill' && c.role === 'spinbutton' && /\bDate(?:Time)? "/.test(c.context)) &&
     (op === 'get_text' || c.role.toLowerCase() !== 'statictext') &&
     (!roles[op] || roles[op]!.includes(c.role.toLowerCase())));
-  if (candidates.length > 253) throw new JevError('TOO_MANY_CANDIDATES', '目标超过 253 个，请用 --scope 限定 CSS 范围。');
   if (!candidates.length) throw new JevError('NO_MATCH', '当前范围内没有可供该动作选择的目标。');
   return candidates;
 }

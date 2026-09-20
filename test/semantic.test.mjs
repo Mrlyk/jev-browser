@@ -106,10 +106,10 @@ test('缺少参数立即停止，未知操作与协议不放行', async () => {
   assert.deepEqual(quotedValues('填写“”和“ A ”'), ['', ' A ']);
 });
 
-test('候选超限明确报错，未截断', () => {
+test('超过单题上限的候选全部保留，交由模型层分批', () => {
   const observation = snapshot(data());
   observation.candidates = Array.from({ length: 254 }, (_, i) => ({ ...observation.candidates[0], ref: `e${i}` }));
-  assert.throws(() => candidatesFor(observation, 'click'), { code: 'TOO_MANY_CANDIDATES' });
+  assert.equal(candidatesFor(observation, 'click').length, 254);
 });
 
 test('解析带 checked、expanded 等状态的真实上游 ref 格式', () => {

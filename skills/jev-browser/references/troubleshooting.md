@@ -12,7 +12,8 @@ Read the actual CLI result before deciding whether to observe, correct input, or
 | `MULTI_STEP_UNSUPPORTED` | Split independent tasks into individual actions. Input followed by Enter on the same field is supported in one natural-language operation. |
 | `CONFIRMATION_EXPIRED`, `CONFIRMATION_NOT_FOUND` | Resolve a fresh plan; old IDs cannot be reused. |
 | `STALE_TARGET` with `dispatched: false` | Observe again and resolve the intended target on the new page. Stop if identity remains uncertain. |
-| `TOO_MANY_CANDIDATES`, `CONTEXT_TOO_LARGE` | Narrow with a verified CSS `--scope`; do not silently truncate candidates. |
+| `CONTEXT_TOO_LARGE` | Target candidates are automatically batched. If the shared context or remaining candidates still exceed the request budget, narrow with a verified CSS `--scope`. |
+| `TOO_MANY_CANDIDATES` | Too many possible input values were extracted; supply the intended text with `--value`. |
 | `INVALID_MODEL_RESPONSE` | Report the invalid model result. Do not turn an unknown choice or missing probability into a successful selection. |
 | `MISSING_API_KEY`, `MODEL_HTTP_*`, `MODEL_UNAVAILABLE` | Check the selected provider's configuration or service status. Do not print keys or silently route data through a different provider. |
 
