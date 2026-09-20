@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, chmodSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -14,6 +14,8 @@ if (result.error || result.status !== 0) process.exit(result.status || 1);
 mkdirSync(join(root, 'libexec'), { recursive: true });
 const suffix = process.platform === 'win32' ? '.exe' : '';
 const destination = join(root, `libexec/jev-browser-core-${process.platform}-${process.arch}${suffix}`);
+// macOS 会按 inode 缓存代码签名；原地覆盖旧二进制会触发 SIGKILL (Code Signature Invalid)，必须先删除再复制。
+rmSync(destination, { force: true });
 copyFileSync(join(root, `cli/target/ci/jev-browser-core${suffix}`), destination);
 chmodSync(destination, 0o755);
 console.log(destination);
