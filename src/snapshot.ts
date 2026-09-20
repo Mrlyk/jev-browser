@@ -3,7 +3,13 @@ import { JevError, object } from './errors.js';
 import type { Operation } from './actions.js';
 
 export type Candidate = { ref: string; role: string; name: string; context: string; backendNodeId: number | null; frameId: string | null };
-export type Snapshot = { id: string; origin: string; pageId: string; frameId: string | null; candidates: Candidate[] };
+export type PageContext = { session: string; tabId: string; targetId: string; title: string; url: string };
+export type Snapshot = { id: string; origin: string; pageId: string; frameId: string | null; candidates: Candidate[]; pageContext?: PageContext };
+
+export function pageContext(value: unknown): PageContext | undefined {
+  if (object(value) && ['session', 'tabId', 'targetId', 'title', 'url'].every(key => typeof value[key] === 'string'))
+    return { session: value.session, tabId: value.tabId, targetId: value.targetId, title: value.title, url: value.url } as PageContext;
+}
 
 export function snapshot(data: unknown): Snapshot {
   if (!object(data) || typeof data.snapshot !== 'string' || !object(data.refs) ||
@@ -29,7 +35,7 @@ export function snapshot(data: unknown): Snapshot {
     stack.push({ indent, text: match[2].replace(/\s*\[[^\]]*\bref=e\d+\]/g, '').replace(/:$/, '') });
   }
   return { id: createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 16), origin: data.origin,
-    pageId: data.pageId, frameId: data.frameId ?? null, candidates };
+    pageId: data.pageId, frameId: data.frameId ?? null, candidates, pageContext: pageContext(data.pageContext) };
 }
 
 export function candidatesFor(observation: Snapshot, op: Operation): Candidate[] {

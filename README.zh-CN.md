@@ -98,7 +98,7 @@ jevb session close demo
 | --- | --- | --- |
 | `--auto-connect` | 自动连接已开启远程调试的本机 Chrome，复用标签页和登录状态 | `jevb tab list mychrome --auto-connect` |
 | `--cdp <port\|url>` | 连接指定调试端口或 CDP 地址，与 `--auto-connect` 二选一 | `jevb page snapshot mychrome --cdp 9222` |
-| `--pin-tab` | 固定会话选中的标签页；标签页关闭后报错，避免切到其他页面 | `jevb page snapshot mychrome --auto-connect --pin-tab` |
+| `--pin-tab` | 绑定当前标签页，并跟随它打开的子标签页；其他页面不会抢走绑定 | `jevb page snapshot mychrome --auto-connect --pin-tab` |
 | `--no-pin-tab` | 取消固定标签页 | `jevb page snapshot mychrome --auto-connect --no-pin-tab` |
 | `--headed` | 启动本地浏览器时显示窗口；连接已有浏览器无需此参数 | `jevb page open demo https://example.com --headed` |
 | `--json` | 以 JSON 输出操作结果，便于脚本读取 | `jevb tab list mychrome --auto-connect --json` |
@@ -114,6 +114,8 @@ jevb page act mychrome "搜索 jev" --auto-connect --pin-tab
 
 将 `t2` 替换为列表中的目标标签页 ID，后续保持同一会话名。以上参数也可通过 `jevb help`、`jevb help browser connect`、`jevb help page act` 或 `jevb help tab list` 查看。
 
+点击当前绑定页的链接打开新标签页时，会话自动跟随新页，后续命令继续操作该页。直接用 `tab create` 创建标签页也会切换绑定。手动切到其他已有标签页时，使用 `tab switch` 明确选择；绑定页关闭后需重新选择。
+
 ### 预览与确认
 
 先看计划，不执行动作：
@@ -122,7 +124,7 @@ jevb page act mychrome "搜索 jev" --auto-connect --pin-tab
 jevb page act demo "搜索 jev" --dry-run --json
 ```
 
-模型不够确定时会展示页面、目标、内容和是否提交。终端输入 `y` 执行，其他输入取消；使用 `--json` 时，`needs_confirmation` 表示尚未执行。根据返回的确认编号，选择执行或取消：
+输出会展示会话名、标签页 ID、页面标题、网址及操作目标；执行后发生跳转时还会显示当前页面。JSON 的 `data.pageContext` 返回当前页面信息，`data.plan` 保留操作前的页面。模型不够确定时，终端输入 `y` 执行，其他输入取消；使用 `--json` 时，`needs_confirmation` 表示尚未执行。根据返回的确认编号，选择执行或取消：
 
 ```bash
 jevb page act demo --confirm <确认编号>

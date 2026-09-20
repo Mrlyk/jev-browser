@@ -44,3 +44,14 @@ test('普通用户看到页面、输入框、内容、清空和提交；敏感�
   const sensitive = plan(); sensitive.hiddenValue = true; sensitive.value = 'secret-token';
   assert.equal(JSON.stringify(planResult(sensitive, 'needs_confirmation')).includes('secret-token'), false);
 });
+
+test('文本输出展示会话、操作标签页与跳转后的页面', () => {
+  const p = plan();
+  p.before.pageContext = { session: 'demo', tabId: 't1', targetId: 'target1', title: '百度搜索', url: p.before.origin };
+  const preview = formatAct(planResult(p, 'needs_confirmation'));
+  for (const text of ['会话：demo', '标签页：t1', '标题：百度搜索']) assert.ok(preview.includes(text));
+  assert.equal(preview.includes('当前标签页'), false);
+  p.afterPage = { session: 'demo', tabId: 't2', targetId: 'target2', title: '百科详情', url: 'https://example.com/detail' };
+  const executed = formatAct(planResult(p, 'executed'));
+  for (const text of ['当前标签页：t2', '当前标题：百科详情', '当前页面：https://example.com/detail']) assert.ok(executed.includes(text));
+});

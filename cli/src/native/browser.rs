@@ -2145,37 +2145,43 @@ impl BrowserManager {
     /// Single decision point for both CDP target drains
     /// (`Target.attachedToTarget` and `Target.targetCreated`). A tracked
     /// target only has its metadata refreshed; a new one is appended and
-    /// activated per pin mode: a pinned session never lets a discovered tab
-    /// steal the active tab or pin binding, a legacy session follows it.
+    /// activated per pin mode: pinned sessions follow their own popups only;
+    /// legacy sessions follow any new target.
     /// Explicit commands (`tab new`, `window new`, `click --new-tab`) take
-    /// their own `add_page` path. Covered by `test_register_discovered_page_*`.
+    /// their own `add_page` path. Bound-page popups also become active; unrelated
+    /// targets stay in the background when pinned.
     pub fn register_discovered_page(
         &mut self,
-        target_id: &str,
+        target: &TargetInfo,
         session_id: &str,
         url: String,
-        title: String,
-        target_type: String,
     ) -> bool {
-        if let Some(p) = self.pages.iter_mut().find(|p| p.target_id == target_id) {
+        if let Some(p) = self
+            .pages
+            .iter_mut()
+            .find(|p| p.target_id == target.target_id)
+        {
             p.url = url;
-            p.title = title;
-            p.target_type = target_type;
+            p.title = target.title.clone();
+            p.target_type = target.target_type.clone();
             return false;
         }
         let tab_id = self.assign_tab_id();
-        // Pinned sessions never activate a discovered tab (strict no-steal);
-        // legacy sessions follow it, matching pre-pin behavior.
-        let activate = !self.pin_tab;
+        // Follow a popup opened by our bound page, including target=_blank and
+        // window.open. Unrelated tabs must not steal a pinned session.
+        let from_bound_page = target.opener_id.as_deref().is_some_and(|opener| {
+            self.bound_target_id() == Some(opener) && !self.bound_target_is_gone()
+        });
+        let activate = !self.pin_tab || from_bound_page;
         self.add_page_with_activation(
             PageInfo {
                 tab_id,
                 label: None,
-                target_id: target_id.to_string(),
+                target_id: target.target_id.clone(),
                 session_id: session_id.to_string(),
                 url,
-                title,
-                target_type,
+                title: target.title.clone(),
+                target_type: target.target_type.clone(),
             },
             activate,
         );
@@ -2189,6 +2195,18 @@ impl BrowserManager {
     /// Returns the stable `tab_id` of the currently active page, if any.
     pub fn active_tab_id(&self) -> Option<u32> {
         self.pages.get(self.active_page_index).map(|p| p.tab_id)
+    }
+
+    pub fn page_context(&self) -> Option<Value> {
+        if self.bound_target_is_gone() {
+            return None;
+        }
+        self.pages.get(self.active_page_index).map(|p| {
+            json!({
+                "tabId": format_tab_id(p.tab_id), "targetId": p.target_id,
+                "title": p.title, "url": p.url,
+            })
+        })
     }
 
     /// Returns true if a tab with the given stable `tab_id` is still open.
@@ -2543,6 +2561,7 @@ mod tests {
             url: String::new(),
             attached: None,
             browser_context_id: None,
+            opener_id: None,
         };
 
         assert!(should_track_target(&target));
@@ -2557,6 +2576,7 @@ mod tests {
             url: "chrome://newtab/".to_string(),
             attached: None,
             browser_context_id: None,
+            opener_id: None,
         };
 
         assert!(!should_track_target(&target));
@@ -2580,6 +2600,7 @@ mod tests {
             url: "https://example.com/popup".to_string(),
             attached: None,
             browser_context_id: None,
+            opener_id: None,
         };
 
         assert!(update_page_target_info_in_pages(&mut pages, &target));
@@ -3628,6 +3649,41 @@ mod tests {
         );
     }
 
+    fn discovered_target(id: &str, url: &str, opener: Option<&str>) -> TargetInfo {
+        TargetInfo {
+            target_id: id.to_string(),
+            target_type: "page".to_string(),
+            title: "Updated Title".to_string(),
+            url: url.to_string(),
+            attached: None,
+            browser_context_id: None,
+            opener_id: opener.map(str::to_string),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pinned_session_follows_own_popup_and_ignores_foreign_popup() {
+        let mut mgr = test_manager(vec![page(1, TARGET_A, "https://mine.example")]).await;
+        mgr.set_pin_tab(true);
+        let child = discovered_target(TARGET_B, "https://child.example", Some(TARGET_A));
+        assert!(mgr.register_discovered_page(&child, "child-session", child.url.clone()));
+        assert_eq!(mgr.active_target_id().unwrap(), TARGET_B);
+        assert_eq!(mgr.bound_target_id(), Some(TARGET_B));
+        assert_eq!(mgr.page_context().unwrap()["title"], "Updated Title");
+        assert_eq!(
+            mgr.binding_snapshot(),
+            Some((TARGET_B.to_string(), child.url.clone()))
+        );
+        // The duplicate attach/create event must not change the binding again.
+        assert!(!mgr.register_discovered_page(&child, "child-session", child.url.clone()));
+        let unrelated = discovered_target("unrelated", "https://foreign.example", Some("other"));
+        assert!(mgr.register_discovered_page(&unrelated, "foreign-session", unrelated.url.clone()));
+        assert_eq!(mgr.bound_target_id(), Some(TARGET_B));
+        let grandchild = discovered_target("grandchild", "https://next.example", Some(TARGET_B));
+        assert!(mgr.register_discovered_page(&grandchild, "next-session", grandchild.url.clone()));
+        assert_eq!(mgr.bound_target_id(), Some("grandchild"));
+    }
+
     /// A legacy (non-pin) session follows an event-discovered tab; no-steal is
     /// scoped to pinned sessions. Force-red: register without activation and
     /// the active tab stays on TARGET_A.
@@ -3638,11 +3694,9 @@ mod tests {
         assert_eq!(mgr.active_target_id().unwrap(), TARGET_A);
 
         let newly_added = mgr.register_discovered_page(
-            TARGET_B,
+            &discovered_target(TARGET_B, "https://popup.example", None),
             "session-b",
             "https://popup.example".to_string(),
-            String::new(),
-            "page".to_string(),
         );
 
         assert!(newly_added, "an untracked target must be registered");
@@ -3664,11 +3718,9 @@ mod tests {
             "target must be untracked to exercise the vulnerable branch"
         );
         let newly_added = mgr.register_discovered_page(
-            TARGET_B,
+            &discovered_target(TARGET_B, "https://foreign.example", None),
             "session-b",
             "https://foreign.example".to_string(),
-            String::new(),
-            "page".to_string(),
         );
 
         assert!(newly_added, "an untracked target must be registered");
@@ -3745,11 +3797,9 @@ mod tests {
         // A foreign tab appears and is discovered via a CDP event drain while
         // the session is gone.
         let newly_added = mgr.register_discovered_page(
-            TARGET_B,
+            &discovered_target(TARGET_B, "https://foreign.example", None),
             "session-b",
             "https://foreign.example".to_string(),
-            String::new(),
-            "page".to_string(),
         );
         assert!(
             newly_added,
@@ -3781,11 +3831,9 @@ mod tests {
         assert!(mgr.restore_target_binding(TARGET_A, "https://mine.example"));
 
         let newly_added = mgr.register_discovered_page(
-            TARGET_A,
+            &discovered_target(TARGET_A, "https://mine.example/updated", None),
             "session-a",
             "https://mine.example/updated".to_string(),
-            "Updated Title".to_string(),
-            "page".to_string(),
         );
 
         assert!(

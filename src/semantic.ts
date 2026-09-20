@@ -1,6 +1,6 @@
 import { operations, targetless, needsValue, valueOptions, operation, command, type ActOptions, type Operation } from './actions.js';
 import { asChoice, Jev, type Answer } from './jev.js';
-import { snapshot, candidatesFor, assertFresh, type Candidate, type Snapshot } from './snapshot.js';
+import { snapshot, candidatesFor, assertFresh, pageContext, type PageContext, type Candidate, type Snapshot } from './snapshot.js';
 import { buildQuestions, describe, inputValues } from './questions.js';
 import { Browser } from './browser.js';
 import { JevError } from './errors.js';
@@ -11,6 +11,7 @@ export type Uncertainty = { subject: string; message: string; probability: numbe
 export type Plan = {
   operation: Operation; target?: Candidate; value?: string; hiddenValue: boolean; submit: boolean;
   before: Snapshot; scope?: string; dryRun?: boolean; uncertainties: Uncertainty[];
+  afterPage?: PageContext;
   meta: { modelRequests: number; decisions: Jev['evidence']; timings: Record<string, number>;
     snapshotId: string; candidateCount: number; truncated: boolean; scope?: string; valueSource?: string };
 };
@@ -103,7 +104,9 @@ export async function validatePlan(plan: Plan, browser: Browser): Promise<void> 
 
 export function planResult(plan: Plan, status: 'needs_confirmation' | 'resolved' | 'executed' | 'cancelled', result?: unknown) {
   return { success: true, data: { status, operation: plan.operation, target: plan.target,
+    session: plan.before.pageContext?.session, pageContext: plan.afterPage ?? plan.before.pageContext,
     plan: { page: plan.before.origin, action: operations[plan.operation],
+      tabId: plan.before.pageContext?.tabId, title: plan.before.pageContext?.title,
       target: plan.target ? describe(plan.target) : undefined,
       value: plan.value === undefined ? undefined : plan.hiddenValue ? '（输入内容已隐藏）' : plan.value,
       clear: ['fill', 'type'].includes(plan.operation) ? plan.operation === 'fill' : undefined,
@@ -124,12 +127,14 @@ export async function executePlan(plan: Plan, browser: Browser, confirmed = fals
   try {
     dispatched = true;
     const result = await browser.request(command(plan.operation, { ref: plan.target?.ref, value: plan.value }), { dispatch: true, privateValue: plan.value });
+    plan.afterPage = pageContext(result?.pageContext);
     if (plan.submit) {
       // Do not submit on a new page or a replaced field after input handlers run.
       await validatePlan(plan, browser);
       await browser.request(['focus', `@${plan.target!.ref}`], { dispatch: true, privateValue: plan.value });
       await validatePlan(plan, browser);
-      await browser.request(['press', 'Enter'], { dispatch: true, privateValue: plan.value });
+      const submitted = await browser.request(['press', 'Enter'], { dispatch: true, privateValue: plan.value });
+      plan.afterPage = pageContext(submitted?.pageContext);
     }
     plan.meta.timings.executionMs = Math.round(performance.now() - execution);
     plan.meta.timings.totalMs += Math.round(performance.now() - start);

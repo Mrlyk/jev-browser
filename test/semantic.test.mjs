@@ -52,6 +52,24 @@ test('dry-run 观察与复核后不派发', async () => {
   assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
 });
 
+test('预览保留会话标签页标题，执行后报告新绑定页面', async () => {
+  const before = { session: 'demo', tabId: 't1', targetId: 'target1', title: '搜索页', url: 'http://localhost/' };
+  const after = { ...before, tabId: 't2', targetId: 'target2', title: '详情页', url: 'http://localhost/detail' };
+  for (const dryRun of [true, false]) {
+    const s = setup({ target: 'e1' });
+    const original = s.browser.request;
+    s.browser.request = async (args, config) => {
+      const result = await original(args, config);
+      return args[0] === 'snapshot' ? { ...result, pageContext: before } : config?.dispatch ? { ...result, pageContext: after } : result;
+    };
+    const result = await act(options({ dryRun }), s.browser, s.jev);
+    assert.equal(result.data.session, 'demo');
+    assert.equal(result.data.plan.tabId, 't1');
+    assert.equal(result.data.plan.title, '搜索页');
+    assert.deepEqual(result.data.pageContext, dryRun ? before : after);
+  }
+});
+
 test('none、歧义、多步、否定不执行', async () => {
   for (const [selections, opts, code] of [
     [{ target: 'none' }, options(), 'NO_MATCH'],

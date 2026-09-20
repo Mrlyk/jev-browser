@@ -84,7 +84,7 @@ const usages: Record<string, string> = {
 export const browserOptionsHelp = `浏览器连接参数：
   --auto-connect       自动连接已开启远程调试的本机 Chrome，复用标签页和登录状态
   --cdp <port|url>      连接指定调试端口或 CDP 地址；与 --auto-connect 二选一
-  --pin-tab            固定会话选中的标签页；标签页关闭后报错，避免切到其他页面
+  --pin-tab            绑定当前标签页并跟随它打开的子标签页，避免其他页面抢走绑定
   --no-pin-tab         取消固定标签页
   --headed             启动本地浏览器时显示窗口；连接已有浏览器无需此参数
   --json               以 JSON 输出操作结果，便于脚本读取

@@ -24,9 +24,12 @@ async function askUrl(): Promise<string | undefined> {
 }
 
 export function formatAct(result: Result): string {
-  const { status, plan, uncertainties } = result.data;
-  const lines = [status === 'needs_confirmation' ? '需要你确认，尚未执行。' : status === 'resolved' ? '操作预览，尚未执行。' : status === 'cancelled' ? '已取消，尚未执行。' : '操作已执行。',
-    `页面：${plan.page}`, `操作：${plan.action}`];
+  const { status, plan, uncertainties, session, pageContext } = result.data;
+  const lines = [status === 'needs_confirmation' ? '需要你确认，尚未执行。' : status === 'resolved' ? '操作预览，尚未执行。' : status === 'cancelled' ? '已取消，尚未执行。' : '操作已执行。'];
+  if (session) lines.push(`会话：${session}`);
+  if (plan.tabId) lines.push(`标签页：${plan.tabId}`);
+  if (plan.title !== undefined) lines.push(`标题：${plan.title || '（无标题）'}`);
+  lines.push(`页面：${plan.page}`, `操作：${plan.action}`);
   if (plan.target) lines.push(`目标：${plan.target}`);
   if (plan.value !== undefined) lines.push(`内容：${JSON.stringify(plan.value)}`);
   if (plan.clear !== undefined) lines.push(`原有内容：${plan.clear ? '清空后填写' : '保留并追加'}`, `输入后：${plan.submit ? '按回车提交' : '不提交'}`);
@@ -39,12 +42,17 @@ export function formatAct(result: Result): string {
       `执行：${result.confirmation.confirmCommand}`, `取消：${result.confirmation.cancelCommand}`);
   }
   if (result.data.result !== undefined) lines.push(JSON.stringify(result.data.result));
+  if (status === 'executed' && pageContext && (pageContext.tabId !== plan.tabId || pageContext.url !== plan.page || pageContext.title !== plan.title))
+    lines.push(`当前标签页：${pageContext.tabId}`, `当前标题：${pageContext.title || '（无标题）'}`, `当前页面：${pageContext.url}`);
   return lines.join('\n') + '\n';
 }
 
 export async function runAct(options: ActOptions, browser: Browser, context: { session: string; json: boolean }) {
   const startupMs = Math.round(performance.now());
-  const print = (result: Result) => process.stdout.write(context.json ? JSON.stringify(result) + '\n' : formatAct(result));
+  const print = (result: Result) => {
+    result.data.session = context.session;
+    process.stdout.write(context.json ? JSON.stringify(result) + '\n' : formatAct(result));
+  };
   if (options.confirm || options.cancel) {
     const plan = await takePending((options.confirm || options.cancel)!, context.session);
     print(options.cancel ? planResult(plan, 'cancelled') : await executePlan(plan, browser, true));

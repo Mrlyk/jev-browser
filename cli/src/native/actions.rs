@@ -1195,8 +1195,28 @@ impl DaemonState {
     }
 
     pub async fn drain_cdp_events_background(&mut self) -> Result<(), String> {
+        let before = self
+            .browser
+            .as_ref()
+            .and_then(|b| b.active_target_id().ok())
+            .map(str::to_string);
         let drained = self.drain_cdp_events();
-        self.apply_drained_events(drained).await
+        self.apply_drained_events(drained).await?;
+        let after = self
+            .browser
+            .as_ref()
+            .and_then(|b| b.active_target_id().ok())
+            .map(str::to_string);
+        if before != after {
+            self.ref_map.begin_snapshot();
+            self.active_frame_id = None;
+            self.webmcp.clear_invocations();
+            self.refresh_active_iframe_sessions().await;
+            if let Some(error) = maybe_persist_tab_binding(self) {
+                return Err(format!("Failed to persist the new tab binding: {}", error));
+            }
+        }
+        Ok(())
     }
 
     async fn refresh_active_iframe_sessions(&mut self) {
@@ -1332,18 +1352,9 @@ impl DaemonState {
                     // page via `add_page` on their own path before this
                     // event is ever drained, so this branch never runs for
                     // agent-initiated tabs. `register_discovered_page` is the
-                    // single decision point shared with the
-                    // `Target.targetCreated` handler below: a pinned session
-                    // never activates a discovered target (that would steal
-                    // the active tab and overwrite its binding); a legacy
-                    // session follows it.
-                    mgr.register_discovered_page(
-                        &target_info.target_id,
-                        page_sid,
-                        page_url,
-                        target_info.title.clone(),
-                        target_info.target_type.clone(),
-                    );
+                    // single decision point shared with targetCreated: pinned
+                    // sessions follow children of their bound page only.
+                    mgr.register_discovered_page(target_info, page_sid, page_url);
 
                     mgr.resume_if_waiting_pub(page_sid).await
                 }
@@ -1463,18 +1474,11 @@ impl DaemonState {
                     // Event-discovered target (e.g. a tab the human opened in the
                     // shared Chrome, or a JS-opened popup): register it via the
                     // same `register_discovered_page` decision point used by the
-                    // `Target.attachedToTarget` handler above, which activates it
-                    // only for legacy sessions; a pinned session never adopts a
-                    // discovered tab (that steal would also overwrite its
-                    // binding). Explicit commands (`tab new`, `window new`,
+                    // `Target.attachedToTarget` handler above, which follows
+                    // children of the bound page even when pinned.
+                    // Explicit commands (`tab new`, `window new`,
                     // `click --new-tab`) activate via their own paths.
-                    mgr.register_discovered_page(
-                        &te.target_info.target_id,
-                        &attach.session_id,
-                        page_url,
-                        te.target_info.title.clone(),
-                        te.target_info.target_type.clone(),
-                    );
+                    mgr.register_discovered_page(&te.target_info, &attach.session_id, page_url);
                     mgr.resume_if_waiting_pub(&attach.session_id).await
                 }
                 .await
@@ -3149,6 +3153,15 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
             lifecycle_launched,
             lifecycle_relaunched_browser,
         );
+    }
+    if !skip_launch {
+        if let Some(mut page) = state.browser.as_ref().and_then(|b| b.page_context()) {
+            page["session"] = json!(state.session_id);
+            if let Some(data) = resp.get_mut("data").and_then(Value::as_object_mut) {
+                // Snapshots supply a freshly read title and URL.
+                data.entry("pageContext".to_string()).or_insert(page);
+            }
+        }
     }
     attach_webmcp_availability(&mut resp, action, state).await;
 
@@ -5611,8 +5624,12 @@ async fn handle_snapshot(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
     });
 
     if !cmd.get("delta").and_then(Value::as_bool).unwrap_or(false) {
+        let mut page_context = mgr.page_context().unwrap_or_default();
+        page_context["session"] = json!(state.session_id);
+        page_context["title"] = json!(mgr.get_title().await.unwrap_or_default());
+        page_context["url"] = json!(url);
         return Ok(
-            json!({ "snapshot": tree, "origin": url, "refs": refs, "removedRefs": removed_refs, "pageId": session_id, "frameId": state.active_frame_id }),
+            json!({ "snapshot": tree, "origin": url, "refs": refs, "removedRefs": removed_refs, "pageId": session_id, "frameId": state.active_frame_id, "pageContext": page_context }),
         );
     }
 

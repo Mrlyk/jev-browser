@@ -11919,68 +11919,98 @@ async fn e2e_pin_tab_rebinds_after_daemon_restart() {
     assert_success(&resp);
 }
 
-// Real-Chrome smoke test: a foreign tab opened via `window.open` inside the
-// pinned session's own page must never steal the active tab or overwrite the
-// pin binding. NOTE: this does NOT specifically guard finding #3 (the
-// `Target.attachedToTarget`-before-`Target.targetCreated` race) — empirically
-// in this environment Chrome always delivers `Target.targetCreated` first for
-// a `window.open()` popup, so this only exercises the `new_targets` drain
-// path in actions.rs (~line 1082), which was never the buggy branch. The
-// deterministic, race-independent regression coverage for finding #3 itself
-// lives at the unit level: `BrowserManager::register_discovered_page` (the
-// single decision point both drain handlers call) is exercised directly by
-// `test_register_discovered_page_untracked_target_does_not_steal_pinned_tab`
-// in browser.rs, which fails if that function's internal `add_page` vs.
-// `add_page_without_activation` choice regresses. This e2e test is kept as a
-// general non-regression smoke check against real Chrome, not as #3 proof.
+// A popup from the bound page follows its opener; a popup from another page
+// in the same Chrome leaves this session's binding intact.
 #[tokio::test]
 #[ignore]
-async fn e2e_auto_attached_foreign_tab_does_not_steal_pinned_tab() {
+async fn e2e_pinned_session_follows_own_popup_only() {
     let (guard, _dir) = binding_test_env();
     let (mut host, ws_url) = launch_binding_host(&guard).await;
+    let mut state_a =
+        attach_pinned_session(&guard, "e2e-popup-a", &ws_url, "data:text/html,parent-a").await;
+    let mut state_b =
+        attach_pinned_session(&guard, "e2e-popup-b", &ws_url, "data:text/html,parent-b").await;
+    let binding_before = load_binding("e2e-popup-a", "parent binding");
 
-    let url_a = "data:text/html,pinned-session-a";
-    let mut state_a = attach_pinned_session(&guard, "e2e-foreign-a", &ws_url, url_a).await;
-    let binding_before = load_binding("e2e-foreign-a", "session A binding should persist");
-
-    // Open a foreign tab in the shared browser. This is not an agent command
-    // (`tab new`), it is a plain popup — the same shape as a human opening a
-    // tab or a page calling `window.open`.
-    let resp = execute_command(
-        &json!({
-            "id": "foreign-open",
-            "action": "evaluate",
-            "script": "window.open('data:text/html,foreign-popup'); 'opened'"
-        }),
-        &mut state_a,
-    )
-    .await;
-    assert_success(&resp);
-
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-    let resp = current_url(&mut state_a, "a-url-after-foreign").await;
-    assert_success(&resp);
-
-    let mgr = state_a.browser.as_ref().expect("browser should be running");
-    let page_count_before = 1; // the pinned session's own bound tab
-    assert!(
-        mgr.page_count() > page_count_before,
-        "the foreign popup must still register in tab list (got {} pages)",
-        mgr.page_count()
+    assert_success(
+        &execute_command(
+            &json!({"id":"foreign", "action":"evaluate",
+        "script":"window.open('about:blank'); 'opened'"}),
+            &mut state_b,
+        )
+        .await,
     );
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert_success(&current_url(&mut state_a, "check-foreign").await);
     assert_eq!(
-        get_data(&resp)["url"],
-        url_a,
-        "the pinned session's active tab must not be stolen by the foreign popup"
-    );
-    assert_eq!(
-        mgr.bound_target_id(),
-        Some(binding_before.target_id.as_str()),
-        "the pin binding must not be overwritten by the foreign popup"
+        state_a.browser.as_ref().unwrap().bound_target_id(),
+        Some(binding_before.target_id.as_str())
     );
 
-    let resp = execute_command(&json!({ "id": "host-99", "action": "close" }), &mut host).await;
+    assert_success(
+        &execute_command(
+            &json!({"id":"own", "action":"evaluate",
+        "script":"window.open('about:blank'); 'opened'"}),
+            &mut state_a,
+        )
+        .await,
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let resp = current_url(&mut state_a, "check-child").await;
     assert_success(&resp);
+    assert_eq!(get_data(&resp)["url"], "about:blank");
+    let child = state_a.browser.as_ref().unwrap().bound_target_id().unwrap();
+    assert_ne!(child, binding_before.target_id);
+    assert_eq!(
+        load_binding("e2e-popup-a", "child binding").target_id,
+        child
+    );
+    assert_eq!(get_data(&resp)["pageContext"]["targetId"], child);
+    for rel in ["opener", "noopener"] {
+        assert_success(&execute_command(&json!({"id":"link-fixture", "action":"evaluate",
+            "script":format!("document.body.innerHTML = '<a id=next href=about:blank target=_blank rel={rel}>Next</a>'; document.title = 'Parent'; 'ready'")}), &mut state_a).await);
+        let previous = state_a
+            .browser
+            .as_ref()
+            .unwrap()
+            .bound_target_id()
+            .unwrap()
+            .to_string();
+        let clicked = execute_command(
+            &json!({"id":"click-link", "action":"click", "selector":"#next"}),
+            &mut state_a,
+        )
+        .await;
+        assert_success(&clicked);
+        let snapshot = execute_command(
+            &json!({"id":"child-snapshot", "action":"snapshot"}),
+            &mut state_a,
+        )
+        .await;
+        assert_success(&snapshot);
+        let page = &get_data(&snapshot)["pageContext"];
+        assert_ne!(
+            page["targetId"].as_str().unwrap(),
+            previous,
+            "target=_blank rel={rel} must follow"
+        );
+        assert_ne!(
+            get_data(&clicked)["pageContext"]["targetId"]
+                .as_str()
+                .unwrap(),
+            previous,
+            "click response must report the child tab"
+        );
+        assert_eq!(page["session"], "e2e-popup-a");
+        assert_eq!(page["url"], "about:blank");
+        assert_eq!(
+            load_binding("e2e-popup-a", "click binding").target_id,
+            page["targetId"].as_str().unwrap()
+        );
+    }
+    assert_success(
+        &execute_command(&json!({"id":"host-close", "action":"close"}), &mut host).await,
+    );
 }
 
 // SCRATCH (finding #3): explicit agent commands must still end up active

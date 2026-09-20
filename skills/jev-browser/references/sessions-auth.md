@@ -61,6 +61,8 @@ jev-browser page snapshot task-demo --cdp 9222 --pin-tab --json
 
 Replace `t2` with the observed tab ID or target ID. Continue passing `--pin-tab` for the shared-browser workflow. A missing bound tab should be resolved deliberately, not by interacting with whichever tab happens to be active.
 
+A pinned session follows a new tab whose CDP opener is its currently bound page, including links with `target="_blank"` and `window.open`. The new binding is persisted for subsequent commands. Tabs opened by unrelated pages do not steal the binding. Explicit `tab create` and `tab switch` also update it; manually focusing another existing tab does not. Semantic output includes the session, tab ID, title and URL; `data.pageContext` reports the current page after execution while `data.plan` retains the original action page.
+
 ## Login and state reuse
 
 For a page with these observed controls, pass a secret through stdin and verify the logged-in state independently:
