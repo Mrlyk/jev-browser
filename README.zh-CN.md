@@ -60,21 +60,7 @@ jevb session close demo
 
 `page act` 接收自然语言；已知网址、选择器或按键时，可以直接使用 `page open`、`element click`、`keyboard press` 等命令，省去模型判断。
 
-一次 `page act` 执行一项操作，搜索可包含输入和回车。其他多步任务分开调用。
-
-打开常用网站可直接说名称，例如 `jevb page act demo "打开Google" --headed`。内置 30 个站点，支持常见中英文名称和别名：
-
-| 类别 | 站点 |
-| --- | --- |
-| 搜索与百科 | Google（谷歌）、百度、Bing（必应）、DuckDuckGo、Yahoo（雅虎）、Wikipedia（维基百科） |
-| 开发 | GitHub、GitLab、Stack Overflow、CSDN、掘金、npm |
-| 购物 | 淘宝、京东、天猫、Amazon（亚马逊） |
-| 社交与社区 | 知乎、豆瓣、微博、小红书、X（Twitter）、Reddit、Facebook、Instagram、LinkedIn（领英） |
-| 视频与音乐 | B站、YouTube（油管）、抖音、Netflix（奈飞）、Spotify |
-
-其他网站请提供完整网址，例如 `jevb page act demo "打开 https://example.com"`。
-
-网站未匹配时，终端会提示输入完整网址，直接回车取消；`--json` 或非交互调用返回 `NEEDS_URL` 和重试示例。网站匹配不够确定时仍需确认，`--dry-run` 只预览。
+一次 `page act` 执行一项操作，搜索可包含输入和回车。其他多步任务分开调用；用自然语言打开网站时需要完整 URL。
 
 ### 常用命令
 

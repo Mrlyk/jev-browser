@@ -62,21 +62,7 @@ Browser operations use `jevb <resource> <action> <session> [object] [options]`. 
 
 `page act` accepts natural language. When you know the URL, selector, or key, use commands such as `page open`, `element click`, or `keyboard press` without a model decision.
 
-Each `page act` performs one operation; a search may include typing and pressing Enter. Split other multi-step tasks into separate calls.
-
-Open common sites by name, for example `jevb page act demo "Open Google" --headed`. There are 30 built-in sites, with common English and Chinese aliases:
-
-| Category | Sites |
-| --- | --- |
-| Search and encyclopedia | Google, Baidu, Bing, DuckDuckGo, Yahoo, Wikipedia |
-| Development | GitHub, GitLab, Stack Overflow, CSDN, Juejin, npm |
-| Shopping | Taobao, JD, Tmall, Amazon |
-| Social and community | Zhihu, Douban, Weibo, Xiaohongshu, X (Twitter), Reddit, Facebook, Instagram, LinkedIn |
-| Video and music | Bilibili, YouTube, Douyin, Netflix, Spotify |
-
-For other sites, provide a full URL, such as `jevb page act demo "Open https://example.com"`.
-
-When no site matches, the terminal prompts for a full URL; press Enter to cancel. JSON and non-interactive calls return `NEEDS_URL` with a retry example. Uncertain matches still require confirmation, and `--dry-run` only previews the action.
+Each `page act` performs one operation; a search may include typing and pressing Enter. Split other multi-step tasks into separate calls. Natural-language navigation requires a full URL.
 
 ### Common commands
 
