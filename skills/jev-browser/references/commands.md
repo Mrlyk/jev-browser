@@ -28,7 +28,15 @@ jev-browser --session task-demo --json act --op scroll 'Scroll down' --value dow
 
 `--scope` is a confirmed CSS selector. `--dry-run` selects and checks a target without acting. Semantic `scroll` moves 500 px in `up`, `down`, `left`, or `right`. Semantic `press` accepts common keys such as Enter, Tab, Escape, arrows, and `Control+a`/`Meta+a`; use help and atomic `press` for additional key syntax.
 
-With `--op` and an explicit value, element selection normally needs one model request. Without `--op`, action classification comes first. When a value must be selected from quoted spans, target and value questions share the next request. Values supplied through `--value` or stdin are not included in those model questions.
+Without `--op`, action, input target, source value, clearing, and submission judgments share one model request. Only relevant branches affect execution. `act '搜索 jev'` can fill the search field and press Enter. Explicit `--op fill/type` keeps its atomic behavior and does not submit. Values supplied through `--value` or stdin are not sent to the model or echoed.
+
+When `data.status` is `needs_confirmation`, inspect `data.plan` and `data.uncertainties` and obtain the user's decision before using the returned `confirmation.confirmCommand` or `confirmation.cancelCommand`. Do not automatically confirm or lower thresholds. The ID expires after five minutes, is bound to the original session, and is consumed once. Confirmation reuses the displayed plan without a new model call and revalidates the page and target. `--dry-run` does not create a confirmation ID.
+
+```bash
+jev-browser --session task-demo --json act '搜索 jev'
+jev-browser --session task-demo --json act --confirm <confirmation-id>
+jev-browser --session task-demo --json act --cancel <confirmation-id>
+```
 
 ## Navigation and deterministic interaction
 

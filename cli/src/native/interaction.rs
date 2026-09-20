@@ -256,12 +256,24 @@ pub async fn type_text(
     )
     .await?;
 
-    // Focus
+    // `type` appends even if the field was never focused or has a selection.
     client
         .send_command_typed::<_, Value>(
             "Runtime.callFunctionOn",
             &CallFunctionOnParams {
-                function_declaration: "function() { this.focus(); }".to_string(),
+                function_declaration: r#"function() {
+                    this.focus();
+                    if (this.isContentEditable) {
+                        const range = this.ownerDocument.createRange();
+                        range.selectNodeContents(this);
+                        range.collapse(false);
+                        const selection = this.ownerDocument.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    } else if (typeof this.setSelectionRange === 'function') {
+                        try { this.setSelectionRange(this.value.length, this.value.length); } catch (_) {}
+                    }
+                }"#.to_string(),
                 object_id: Some(object_id.clone()),
                 arguments: None,
                 return_by_value: Some(true),

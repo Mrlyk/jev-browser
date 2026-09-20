@@ -10,7 +10,7 @@ export const operations = {
 export type Operation = keyof typeof operations;
 export type ActOptions = {
   instruction: string; op?: Operation; value?: string; valueStdin?: boolean; scope?: string;
-  dryRun?: boolean; probability: number; margin: number;
+  dryRun?: boolean; probability: number; margin: number; confirm?: string; cancel?: string;
 };
 export const targetless = new Set<Operation>(['open', 'back', 'forward', 'reload', 'scroll', 'press']);
 export const needsValue = new Set<Operation>(['fill', 'type', 'select', 'open', 'press', 'scroll']);

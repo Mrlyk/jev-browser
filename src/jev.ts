@@ -1,9 +1,10 @@
 import { JevError, object } from './errors.js';
 import { type Credentials } from './credentials.js';
 
-export type Question = { type: 'choice'; instructions: string; criteria: Record<string, string> };
+export type Question = { type: 'choice' | 'noul'; instructions: string; criteria: Record<string, string> };
 export type Answer = { type: 'choice'; choice: string; probabilities: Record<string, number>; confidence: number };
-export type Evaluation = { model: string; answers: Record<string, Answer>; usage?: unknown; id?: string };
+export type NoulAnswer = { type: 'noul'; noul: number };
+export type Evaluation = { model: string; answers: Record<string, Answer | NoulAnswer>; usage?: unknown; id?: string };
 export type ModelConfig = { transport: 'typesafe' | 'openrouter'; endpoint: string; model: string; key: string };
 
 export function modelConfig(env = process.env, stored: Credentials = {}): ModelConfig {
@@ -24,6 +25,17 @@ export function choice(instructions: string, criteria: Record<string, string>): 
   return { type: 'choice', instructions, criteria };
 }
 
+export function noul(instructions: string, criteria: { true: string; false: string }): Question {
+  return { type: 'noul', instructions, criteria };
+}
+
+// A yes/no probability uses the same gate as a two-option choice.
+export function asChoice(answer: Answer | NoulAnswer): Answer {
+  if (answer.type === 'choice') return answer;
+  return { type: 'choice', choice: answer.noul > 0.5 ? 'true' : 'false',
+    probabilities: { true: answer.noul, false: 1 - answer.noul }, confidence: Math.abs(2 * answer.noul - 1) };
+}
+
 function probability(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 }
@@ -33,6 +45,10 @@ export function validateEvaluation(raw: unknown, questions: Record<string, Quest
   if (!object(raw) || typeof raw.model !== 'string' || !raw.model || !object(raw.answers)) throw invalid();
   for (const [id, q] of Object.entries(questions)) {
     const a = raw.answers[id];
+    if (q.type === 'noul') {
+      if (!object(a) || a.type !== 'noul' || !probability(a.noul)) throw invalid();
+      continue;
+    }
     if (!object(a) || a.type !== 'choice' || typeof a.choice !== 'string' ||
       !Object.hasOwn(q.criteria, a.choice) || !probability(a.confidence) || !object(a.probabilities)) throw invalid();
     const keys = Object.keys(q.criteria);

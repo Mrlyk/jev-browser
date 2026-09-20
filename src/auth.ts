@@ -29,7 +29,7 @@ export async function login(provider: Provider, key: string, options: { env?: No
   const result = await new Jev(config, options.request).evaluate('ready', {
     check: choice('Is the state ready?', { yes: 'Ready', no: 'Not ready' }),
   });
-  if (result.answers.check.choice !== 'yes')
+  if (result.answers.check.type !== 'choice' || result.answers.check.choice !== 'yes')
     throw new JevError('MODEL_CHECK_FAILED', '登录失败，请稍后重试。');
   const durationMs = Math.round(performance.now() - start);
   await saveCredential(provider, key, env);

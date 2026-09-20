@@ -49,7 +49,7 @@ export function parseArgs(args: string[]) {
       if (arg === '--') { words.push(...rest.slice(i + 1)); break; }
       if (arg === '--dry-run') { options.dryRun = true; continue; }
       if (arg === '--value-stdin') { options.valueStdin = true; continue; }
-      if (['--op', '--value', '--scope', '--min-probability', '--min-margin'].includes(arg)) {
+      if (['--op', '--value', '--scope', '--min-probability', '--min-margin', '--confirm', '--cancel'].includes(arg)) {
         const value = rest[++i];
         if (value === undefined) throw new JevError('INVALID_ARGUMENT', `${arg} 缺少参数。`);
         if (arg === '--op') options.op = operation(value);
@@ -57,6 +57,8 @@ export function parseArgs(args: string[]) {
         if (arg === '--scope') options.scope = value;
         if (arg === '--min-probability') options.probability = Number(value);
         if (arg === '--min-margin') options.margin = Number(value);
+        if (arg === '--confirm') options.confirm = value;
+        if (arg === '--cancel') options.cancel = value;
         continue;
       }
       const n = globalLength(rest, i, false);
@@ -65,7 +67,10 @@ export function parseArgs(args: string[]) {
       words.push(arg);
     }
     options.instruction = words.join(' ').trim();
-    if (!options.instruction) throw new JevError('NEEDS_INPUT', 'act 需要一条指令或目标描述。');
+    if (!options.instruction && !options.confirm && !options.cancel) throw new JevError('NEEDS_INPUT', 'act 需要一条指令或目标描述。');
+    if ((options.confirm || options.cancel) && (options.instruction || options.op || options.value !== undefined || options.valueStdin ||
+      options.scope || options.dryRun || (options.confirm && options.cancel) || rest.includes('--min-probability') || rest.includes('--min-margin')))
+      throw new JevError('INVALID_ARGUMENT', '--confirm / --cancel 只能使用原计划，不能同时修改指令、参数或阈值。');
     if (options.valueStdin && options.value !== undefined) throw new JevError('INVALID_ARGUMENT', '--value 与 --value-stdin 不能同时使用。');
     for (const v of [options.probability, options.margin])
       if (!Number.isFinite(v) || v < 0 || v > 1) throw new JevError('INVALID_ARGUMENT', '概率和差值阈值必须在 0 到 1 之间。');

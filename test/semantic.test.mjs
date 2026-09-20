@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { act } from '../dist/semantic.js';
+import { act, prepareAct, executePlan } from '../dist/semantic.js';
 import { Jev, modelConfig } from '../dist/jev.js';
 import { parseArgs } from '../dist/arguments.js';
 import { snapshot, candidatesFor } from '../dist/snapshot.js';
 import { command, quotedValues } from '../dist/actions.js';
+import { JevError } from '../dist/errors.js';
 
 const data = () => ({ origin: 'http://localhost/', pageId: 'p1', frameId: null,
   snapshot: '- document\n  - region "入住信息":\n    - button "确认" [ref=e1]\n    - textbox "姓名" [ref=e2]\n  - region "发票信息":\n    - button "确认" [ref=e3]',
@@ -17,7 +18,10 @@ function setup(selections, changed) {
   const jev = new Jev(modelConfig({ TYPESAFE_API_KEY: 'test' }), async (_url, init) => {
     const request = JSON.parse(init.body); requests.push(request);
     const answers = Object.fromEntries(Object.entries(request.questions).map(([id, q]) => {
-      const selected = selections[id];
+      if (q.type === 'noul') return [id, { type: 'noul', noul: selections[id] ?? (id === 'clear' ? 1 : 0) }];
+      const selected = selections[id] ?? (id === 'input_target' ? selections.target : undefined) ?? 'none';
+      if (typeof selected === 'object') return [id, { type: 'choice', confidence: 0.5, choice: selected.choice,
+        probabilities: { ...Object.fromEntries(Object.keys(q.criteria).map(k => [k, 0])), ...selected.probabilities } }];
       return [id, { type: 'choice', choice: selected, confidence: 1,
         probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === selected ? 1 : 0])) }];
     }));
@@ -77,12 +81,11 @@ test('原文值选择与目标独立，空白、换行、shell 字符保持原�
   assert.equal(s.commands.at(-1).args[2], secret);
   assert.equal(JSON.stringify(s.requests).includes(secret), false);
   assert.equal(JSON.stringify(result).includes('touch nope'), false);
-  const q = setup({ operation: 'fill', target: 'e2', value: 'v1' });
+  const q = setup({ operation: 'input', target: 'e2', value: 'v1' });
   await act(options({ op: undefined, instruction: '在“姓名”中填写“张三”' }), q.browser, q.jev);
   assert.deepEqual(q.commands.at(-1).args, ['fill', '@e2', '张三']);
-  assert.equal(q.requests.length, 2);
-  assert.deepEqual(Object.keys(q.requests[0].questions), ['operation']);
-  assert.deepEqual(Object.keys(q.requests[1].questions).sort(), ['target', 'value']);
+  assert.equal(q.requests.length, 1);
+  for (const key of ['operation', 'input_target', 'clear', 'submit', 'value']) assert.ok(q.requests[0].questions[key]);
 });
 
 test('已知动作时，目标与原文值在一次请求中批量判断', async () => {
@@ -144,4 +147,92 @@ test('执行未知不自动再次调用', async () => {
   };
   await assert.rejects(act(options(), s.browser, s.jev), { code: 'EXECUTION_UNKNOWN' });
   assert.equal(dispatched, 1);
+});
+
+test('搜索同时判断动作、输入框、清空、回车和内容，无关分支不阻塞', async () => {
+  const s = setup({ operation: 'input', input_target: 'e2', clear: 0.99, submit: 0.99, value: 'v0', target: 'ambiguous' });
+  const result = await act(options({ op: undefined, instruction: '搜索 jev' }), s.browser, s.jev);
+  assert.equal(s.requests.length, 1);
+  assert.equal(s.requests[0].questions.clear.type, 'noul');
+  assert.equal(s.requests[0].questions.submit.type, 'noul');
+  assert.equal(result.data.plan.value, 'jev');
+  assert.equal(result.data.plan.clear, true);
+  assert.equal(result.data.plan.submit, true);
+  assert.deepEqual(s.commands.filter(c => c.config?.dispatch).map(c => c.args), [
+    ['fill', '@e2', 'jev'], ['focus', '@e2'], ['press', 'Enter'],
+  ]);
+});
+
+test('模型决定保留旧值和不提交，显式 fill/type 保留原子行为', async () => {
+  const s = setup({ operation: 'input', input_target: 'e2', clear: 0.01, submit: 0.01, value: 'v0' });
+  const result = await act(options({ op: undefined, instruction: '追加“jev”但不提交' }), s.browser, s.jev);
+  assert.equal(result.data.plan.clear, false);
+  assert.equal(result.data.plan.submit, false);
+  assert.deepEqual(s.commands.filter(c => c.config?.dispatch).map(c => c.args), [['type', '@e2', 'jev']]);
+  for (const op of ['fill', 'type']) {
+    const explicit = setup({ target: 'e2' });
+    await act(options({ op, instruction: '搜索框', value: 'jev' }), explicit.browser, explicit.jev);
+    assert.equal(explicit.requests[0].questions.clear, undefined);
+    assert.equal(explicit.requests[0].questions.submit, undefined);
+    assert.deepEqual(explicit.commands.filter(c => c.config?.dispatch).map(c => c.args), [[op, '@e2', 'jev']]);
+  }
+});
+
+test('任何相关判断未过阈值都返回待确认计划，尚未执行', async () => {
+  const uncertain = choice => ({ choice, probabilities: { [choice]: 0.65, none: 0.35 } });
+  for (const override of [
+    { operation: { choice: 'input', probabilities: { input: 0.65, click: 0.35 } } },
+    { input_target: uncertain('e2') }, { value: uncertain('v0') }, { clear: 0.6 }, { submit: 0.6 },
+  ]) {
+    const s = setup({ operation: 'input', input_target: 'e2', clear: 0.99, submit: 0.99, value: 'v0', ...override });
+    const plan = await prepareAct(options({ op: undefined, instruction: '搜索 jev' }), s.browser, s.jev);
+    const result = await executePlan(plan, s.browser);
+    assert.equal(result.data.status, 'needs_confirmation');
+    assert.equal(result.data.uncertainties.length, 1);
+    assert.equal(result.data.plan.value, 'jev');
+    assert.equal(result.data.plan.submit, true);
+    assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+    assert.equal((await executePlan(plan, s.browser, true)).data.status, 'executed');
+    assert.equal(s.requests.length, 1);
+  }
+});
+
+test('确认后仍拒绝页面变化，dry-run 即使确认也不执行', async () => {
+  const s = setup({ target: { choice: 'e1', probabilities: { e1: 0.55, e3: 0.45 } } });
+  const plan = await prepareAct(options(), s.browser, s.jev);
+  const original = s.browser.request;
+  s.browser.request = async (args, config) => args[0] === 'snapshot' ? { ...data(), pageId: 'different' } : original(args, config);
+  await assert.rejects(executePlan(plan, s.browser, true), { code: 'STALE_TARGET' });
+  assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+  const d = setup({ target: 'e1' });
+  const preview = await prepareAct(options({ dryRun: true }), d.browser, d.jev);
+  assert.equal((await executePlan(preview, d.browser, true)).data.status, 'resolved');
+  assert.equal(d.commands.filter(c => c.config?.dispatch).length, 0);
+});
+
+test('填写后页面变化或提交失败报告部分执行，不重试', async () => {
+  for (const failure of ['navigation', 'submit']) {
+    const s = setup({ operation: 'input', input_target: 'e2', clear: 1, submit: 1, value: 'v0' });
+    let filled = false;
+    const dispatched = [];
+    const original = s.browser.request;
+    s.browser.request = async (args, config) => {
+      if (config?.dispatch) dispatched.push(args);
+      if (args[0] === 'fill') filled = true;
+      if (filled && args[0] === 'snapshot' && failure === 'navigation') return { ...data(), pageId: 'other' };
+      if (args[0] === 'press' && failure === 'submit') throw new JevError('EXECUTION_UNKNOWN', 'timeout', true);
+      return original(args, config);
+    };
+    await assert.rejects(act(options({ op: undefined, instruction: '搜索 jev' }), s.browser, s.jev),
+      { code: failure === 'navigation' ? 'STALE_TARGET' : 'EXECUTION_UNKNOWN', dispatched: true });
+    assert.equal(dispatched.filter(args => args[0] === 'fill').length, 1);
+    assert.equal(dispatched.filter(args => args[0] === 'press').length, failure === 'navigation' ? 0 : 1);
+  }
+});
+
+test('确认编号不可同时修改计划或阈值', () => {
+  assert.equal(parseArgs(['act', '--confirm', 'jev-id']).options.confirm, 'jev-id');
+  assert.equal(parseArgs(['act', '--cancel', 'jev-id']).options.cancel, 'jev-id');
+  for (const extra of [['搜索别的内容'], ['--value', 'other'], ['--dry-run'], ['--scope', '#other'], ['--min-probability', '0'], ['--cancel', 'id']])
+    assert.throws(() => parseArgs(['act', '--confirm', 'jev-id', ...extra]), { code: 'INVALID_ARGUMENT' });
 });

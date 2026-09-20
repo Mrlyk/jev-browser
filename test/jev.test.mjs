@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { Jev, modelConfig, choice, validateEvaluation, accepted } from '../dist/jev.js';
+import { Jev, modelConfig, choice, noul, asChoice, validateEvaluation, accepted } from '../dist/jev.js';
 import { coreEnv } from '../dist/browser.js';
 import { fileURLToPath } from 'node:url';
 
@@ -76,4 +76,15 @@ test('执行器不继承模型 Key 和原版运行配置', () => {
   assert.equal(env.AGENT_BROWSER_NAMESPACE, 'jev');
   assert.equal(env.AGENT_BROWSER_NO_REPLAY, '1');
   assert.equal(env.AGENT_BROWSER_SKILLS_DIR, fileURLToPath(new URL('../skills', import.meta.url)));
+});
+
+test('并行 Noul 与 Choice 响应均校验，yes/no 两端对称处理', () => {
+  const mixed = { ...questions, clear: noul('是否清空？', { true: '清空', false: '保留' }) };
+  const result = { ...valid(), answers: { ...valid().answers, clear: { type: 'noul', noul: 0.95 } } };
+  assert.equal(validateEvaluation(result, mixed).answers.clear.noul, 0.95);
+  assert.equal(asChoice(result.answers.clear).choice, 'true');
+  assert.equal(accepted(asChoice({ type: 'noul', noul: 0.02 })), 'false');
+  assert.throws(() => accepted(asChoice({ type: 'noul', noul: 0.5 })), { code: 'AMBIGUOUS' });
+  for (const answer of [{ type: 'noul', noul: 2 }, { type: 'noul' }, { type: 'noul', noul: '0.9' }, valid().answers.target])
+    assert.throws(() => validateEvaluation({ ...result, answers: { ...result.answers, clear: answer } }, mixed), { code: 'INVALID_MODEL_RESPONSE' });
 });

@@ -89,7 +89,16 @@ jev-browser --session hotel act 'Click Book in the Standard King Room section'
 jev-browser --session hotel act 'Check the I agree to the booking terms checkbox'
 ```
 
-Each `act` performs one action. Call it sequentially for a longer workflow. Quote values to enter and name the section when controls share a label. `executed` means the action completed; verify business outcomes with page or API assertions.
+Each `act` performs one operation, including input followed by submission, such as `act 'Search for jev'`. Jev judges the action, input field, value, clearing, and submission in parallel. Split other independent workflows into separate calls. Quote complex values and name the section when controls share a label. `executed` means the operation completed; verify business outcomes with page or API assertions.
+
+Uncertain decisions display the page, target, value, clearing/submission behavior, and reason for confirmation. In a terminal, enter `y` to execute or anything else to cancel. JSON and non-interactive calls return `needs_confirmation` with a confirmation ID and commands:
+
+```bash
+jev-browser --session demo act --confirm <confirmation-id>
+jev-browser --session demo act --cancel <confirmation-id>
+```
+
+IDs are bound to the original session, expire after five minutes, and can be used once. Confirmation rechecks the page and target before executing the displayed plan. Dry runs never execute or create executable confirmation IDs. Explicit and stdin values are hidden in output; pending plans are temporarily saved in owner-only files and removed on confirmation or cancellation.
 
 ### Useful controls
 
@@ -112,11 +121,9 @@ When you know the selector, use commands such as `click '#submit'` or `fill '#na
 - **Jev model:** selects from supplied options and returns probabilities. Input values come from the user's original text or explicit parameters; the CLI maps the choice to a browser command.
 - **Bundled Rust executor:** uses forked agent-browser source to connect to the browser, perform atomic actions, and retain sessions.
 
-Ambiguous or stale targets stop execution. An action with an unknown outcome is never automatically replayed.
+Low-probability decisions require confirmation. Missing or stale targets stop execution. Targets are also rechecked between input and submission. Partially executed operations and unknown outcomes are never automatically replayed.
 
-For `act 'Fill the "Name" field with "Alex"'`, the CLI first identifies the action, then asks target and value questions together.
-
-`--op` skips action classification. Consecutive operations observe the updated page and are not batched into one model request.
+For `act 'Search for jev'`, independent questions share one request, and code consumes only the relevant branches. Every relevant uncertain decision requires confirmation. Explicit `--op fill/type` retains replacement/append behavior without automatically pressing Enter.
 
 ## 4. Development
 

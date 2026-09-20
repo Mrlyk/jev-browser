@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 import { Browser } from './browser.js';
 import { parseArgs } from './arguments.js';
-import { Jev, modelConfig } from './jev.js';
-import { act } from './semantic.js';
+import { runAct } from './act-cli.js';
 import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
-import { readCredentials } from './credentials.js';
 import { ensureLogin, handleAuth } from './auth.js';
 
 const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
@@ -15,10 +13,13 @@ const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
   open <url>                 打开页面；缺少本地 Chrome 时自动准备
   snapshot --json            读取结构化页面快照
   click @e1 / fill @e2 值     确定性命令，不调用模型
-  act "点击入住信息的确认"     一次选择并执行一个原子操作
+  act "点击入住信息的确认"     选择并执行一次操作
+  act "搜索 jev"             并行判断输入框、内容、清空和提交
   act --op fill "姓名" --value "张三"
   act --op fill "密码" --value-stdin
   act "点击确认" --dry-run --json
+  act --confirm <编号>       确认执行已展示的计划
+  act --cancel <编号>        取消待确认计划
   auth login                登录
   auth login --with-token    从标准输入登录
   auth status / auth logout <提供方>             查看来源 / 删除本地 Key
@@ -54,20 +55,14 @@ async function main(): Promise<void> {
   if (parsed.name === 'help' && parsed.rest[0] === 'auth') { await handleAuth(['--help'], parsed.json); return; }
   const showingHelp = !parsed.name || parsed.name === 'help' || parsed.rest.some(arg => ['--help', '-h'].includes(arg));
   if (parsed.name === 'help' && !parsed.rest.length) process.stdout.write(help + '\n');
-  if (!showingHelp) await ensureLogin();
+  if (!showingHelp && !parsed.options.confirm && !parsed.options.cancel) await ensureLogin();
   if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser-cli 更新完整安装包。');
   if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', '首版尚未打包上游 Dashboard。');
   const browser = new Browser(parsed.globals);
   await withSession(parsed.session, async () => {
     if (parsed.name === 'act') {
-      const jev = new Jev(modelConfig(process.env, readCredentials()));
       if (parsed.options.valueStdin) parsed.options.value = await stdinValue();
-      const startupMs = Math.round(performance.now());
-      const result = await act(parsed.options, browser, jev);
-      result.meta.timings.cliStartupMs = startupMs;
-      process.stdout.write(parsed.json ? JSON.stringify(result) + '\n' :
-        `${result.data.status}: ${result.data.operation}${result.data.target ? ` @${result.data.target.ref} ${result.data.target.name}` : ''}\n` +
-        (result.data.result ? JSON.stringify(result.data.result) + '\n' : ''));
+      await runAct(parsed.options, browser, { session: parsed.session, json: parsed.json });
     } else {
       process.exitCode = await browser.passthrough([parsed.name === 'help' || !parsed.name ? '--help' : parsed.name, ...parsed.rest]);
     }
