@@ -9,19 +9,19 @@ import { ensureLogin, handleAuth } from './auth.js';
 
 const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
 
-用法：jev-browser [全局参数] <资源> <动作> [对象] [选项]
+用法：jev-browser [全局参数] <资源> <动作> [会话名] [对象] [选项]
 
-  page open <url>            打开页面；缺少本地 Chrome 时自动准备
-  page snapshot --json       读取结构化页面快照
-  element click @e1          确定性命令，不调用模型
-  page act "点击入住信息的确认" 选择并执行一次操作
-  page act "搜索 jev"        并行判断输入框、内容、清空和提交
-  page act --op fill "姓名" --value "张三"
-  page act --op fill "密码" --value-stdin
-  page act "点击确认" --dry-run --json
-  page act --confirm <编号>  确认执行已展示的计划
-  page act --cancel <编号>   取消待确认计划
-  session close [会话名]    关闭指定会话，例如 session close demo
+  page open <会话名> <url>            打开页面；缺少本地 Chrome 时自动准备
+  page snapshot demo --json       读取结构化页面快照
+  element click demo @e1          确定性命令，不调用模型
+  page act demo "点击入住信息的确认" 选择并执行一次操作
+  page act demo "搜索 jev"        并行判断输入框、内容、清空和提交
+  page act demo --op fill "姓名" --value "张三"
+  page act demo --op fill "密码" --value-stdin
+  page act demo "点击确认" --dry-run --json
+  page act demo --confirm <编号>  确认执行已展示的计划
+  page act demo --cancel <编号>   取消待确认计划
+  session close <会话名>    关闭指定会话，例如 session close demo
   session close --all       关闭全部会话
   session list              列出运行中的会话
   auth login                登录
@@ -33,20 +33,20 @@ ${resourceOverview()}
 
 page act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
      --min-probability <0..1>（默认 0.85）、--min-margin <0..1>（默认 0.20）
-全局：--session <name>、--headed、--cdp <port|url>、--json
+全局：--headed、--cdp <port|url>、--json
+会话：浏览器操作必须在动作后填写会话名，例如 page act demo "搜索 jev"。
 查看参数：jev-browser <资源> <动作> --help
 命令别名：jevb 与 jev-browser 等价；仅支持资源命令。
 
 首次使用时会提示登录。
 `;
 
-const closeHelp = `用法：jev-browser session close [会话名] | jev-browser session close --all
+const closeHelp = `用法：jev-browser session close <会话名> | jev-browser session close --all
 
   jev-browser session close demo     关闭 demo 会话
   jev-browser session close --all    关闭全部会话
 
-省略会话名时使用 JEV_BROWSER_SESSION，未设置则使用 default。
-会话名、--session 和 --all 不能混用。连接自己的 Chrome 时只断开控制连接。
+会话名必填，或使用 --all；两者不能混用。连接自己的 Chrome 时只断开控制连接。
 `;
 
 async function stdinValue(): Promise<string> {
@@ -84,7 +84,9 @@ async function main(): Promise<void> {
   const browser = new Browser(parsed.globals);
   if (showingHelp) {
     const result = await browser.run([parsed.name === 'help' || !parsed.name ? '--help' : parsed.name, ...parsed.rest]);
-    const text = parsed.commandPath ? result.stdout.replaceAll(`agent-browser ${parsed.name}`, `jev-browser ${parsed.commandPath}`) : result.stdout;
+    const action = parsed.commandPath?.split(' ')[1];
+    const nativeCommand = `${parsed.name}${action && parsed.rest[0] === action ? ` ${action}` : ''}`;
+    const text = parsed.commandPath ? result.stdout.replaceAll(`agent-browser ${nativeCommand}`, `jev-browser ${parsed.commandPath}${parsed.sessionRequired ? ' <会话名>' : ''}`) : result.stdout;
     process.stdout.write(text.replaceAll('agent-browser', 'jev-browser'));
     process.stderr.write(result.stderr);
     process.exitCode = result.code;

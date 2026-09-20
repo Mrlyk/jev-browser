@@ -33,7 +33,7 @@ export async function takePending(id: string, session: string, directory = runti
     throw new JevError('CONFIRMATION_NOT_FOUND', '待确认操作不存在、已处理或已失效，请重新发出指令。');
   }
   if (pending.version !== 1 || pending.session !== session)
-    throw new JevError('INVALID_CONFIRMATION', '这个确认编号属于其他会话，请使用原来的 --session。');
+    throw new JevError('INVALID_CONFIRMATION', '这个确认编号属于其他会话，请在 page act 后填写原来的会话名。');
   await unlink(path);
   if (!Number.isFinite(pending.expiresAt) || pending.expiresAt <= Date.now())
     throw new JevError('CONFIRMATION_EXPIRED', '这份操作计划已超过 5 分钟，请重新发出指令。');

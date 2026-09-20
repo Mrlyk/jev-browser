@@ -32,7 +32,7 @@ function fixture(t) {
 test('session close rejects extra operands, unknown options and conflicts before login or dispatch', t => {
   const { root, run } = fixture(t);
   for (const name of ['session close']) {
-    for (const tail of [['demo', 'other'], ['--all', 'demo'], ['--sesion', 'demo'], ['--all', '--unknown'],
+    for (const tail of [['demo', 'other'], ['--all', 'demo'], ['demo', '--sesion'], ['--all', '--unknown'],
       ['demo', '--session', 'other'], ['--session', 'demo', '--all']]) {
       const result = run([...name.split(' '), ...tail]);
       assert.equal(result.status, 1, result.stderr);
@@ -50,11 +50,11 @@ test('session close rejects extra operands, unknown options and conflicts before
 
 test('session close accepts targets and flags, while legacy entry points fail', () => {
   for (const args of [
-    ['session', 'close', 'demo'], ['session', 'close', '--json', 'demo'],
-    ['--session', 'demo', 'session', 'close'], ['session', 'close', '--session', 'demo'],
+    ['session', 'close', 'demo'], ['--json', 'session', 'close', 'demo'],
   ]) assert.equal(parseArgs(args).session, 'demo');
   assert.deepEqual(parseArgs(['session', 'close', 'demo', '--json']).rest, ['--json']);
   for (const args of [['close', 'demo'], ['--session', 'demo', 'close'], ['quit'], ['exit'],
+    ['--session', 'demo', 'session', 'close'], ['session', 'close', '--session', 'demo'],
     ['session', 'cloase', 'demo'], ['session', 'close', 'demo', '--session', 'other']])
     assert.throws(() => parseArgs(args), { code: 'INVALID_ARGUMENT' });
   assert.throws(() => parseArgs(['session', 'close', '../demo']), { code: 'INVALID_SESSION' });
@@ -66,7 +66,7 @@ test('close help is available without login and explains session selection', t =
   const { run } = fixture(t);
   const result = run(['--help']);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /close \[会话名\]/);
+  assert.match(result.stdout, /close <会话名>/);
   assert.match(result.stdout, /close --all/);
   const subcommand = run(['session', 'close', 'demo', '--help']);
   assert.equal(subcommand.status, 0, subcommand.stderr);
@@ -83,20 +83,20 @@ nativeTest('real executor names the closed session in text and JSON without laun
   for (const [args, session] of [
     [['session', 'close', 'named'], 'named'],
     [['session', 'close', 'demo'], 'demo'],
-    [['--session', 'flags', 'session', 'close'], 'flags'],
-    [['session', 'close', '--session', 'other'], 'other'],
-    [['session', 'close'], 'default'],
+    [['session', 'close', 'flags'], 'flags'],
+    [['session', 'close', 'other'], 'other'],
+    [['session', 'close', 'default'], 'default'],
   ]) {
     const result = run(args, env);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, new RegExp(`^Closed session: ${session}\\n$`));
   }
-  const result = run(['session', 'close', '--json'], { ...env, JEV_BROWSER_SESSION: 'from-env' });
+  const result = run(['session', 'close', 'from-argument', '--json'], { ...env, JEV_BROWSER_SESSION: 'from-env' });
   assert.equal(result.status, 0, result.stderr);
   const response = JSON.parse(result.stdout);
   assert.equal(response.success, true);
   assert.equal(response.data.closed, true);
-  assert.equal(response.data.session, 'from-env');
+  assert.equal(response.data.session, 'from-argument');
   const explicit = run(['session', 'close', 'explicit', '--json'], { ...env, JEV_BROWSER_SESSION: 'from-env' });
   assert.equal(explicit.status, 0, explicit.stderr);
   assert.equal(JSON.parse(explicit.stdout).data.session, 'explicit');
@@ -106,7 +106,7 @@ nativeTest('session close removes only its named daemon from the active session 
   const { run } = fixture(t);
   const env = { TYPESAFE_API_KEY: 'local-test-placeholder' };
   for (const session of ['target', 'keep']) {
-    const started = run(['--session', session, 'stream', 'status', '--json'], env);
+    const started = run(['stream', 'status', session, '--json'], env);
     assert.equal(started.status, 0, started.stderr);
   }
   const closed = run(['session', 'close', 'target', '--json'], env);

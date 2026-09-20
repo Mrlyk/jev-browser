@@ -39,7 +39,9 @@ and use it for browser tasks in this project.
 
 ### CLI commands
 
-Use `jevb <resource> <action> [object] [options]`. Select the browser session with `--session <name>`. Session management takes the name directly, for example `jevb session close demo`.
+Use `jevb <resource> <action> <session> [object] [options]`, for example `jevb page act demo "Search for jev"` and `jevb session close demo`. Browser operations require the positional session; `--session` is rejected with migration guidance, and environment/default sessions do not fill a missing operand.
+
+Global utilities such as `session list`, model `auth login/status/logout`, `browser install/inspect/doctor`, `skill`, and `profile` need no session. `browser connect/configure` and `state save/load` require one; website login uses `auth login <session> <saved-profile>`. The table below omits session operands for browser actions.
 
 | Resource | Actions and purpose |
 | --- | --- |
@@ -62,8 +64,8 @@ Use `jevb <resource> <action> [object] [options]`. Select the browser session wi
 jevb --help
 jevb page --help
 jevb page open --help
-jevb --session demo --headed page open https://www.baidu.com
-jevb --session demo page act 'Click the search field'
+jevb page open demo --headed https://www.baidu.com
+jevb page act demo 'Click the search field'
 jevb session inspect demo
 jevb session close demo
 ```
@@ -74,7 +76,7 @@ Legacy top-level commands such as `open`, `act`, `click`, and `close` have been 
 
 `page act` asks Jev to interpret natural language and then invokes browser actions. Deterministic commands such as `page open` and `element click` execute known URLs or selectors without a model decision. Both use the same executor; natural-language navigation does not require a preceding `page open`.
 
-The CLI currently requires a full URL for navigation through `page act`, for example `jevb --session demo page act 'Open https://www.baidu.com'`. The browser extension additionally maps known site names such as “baidu” to URLs. That mapping is not yet implemented in the CLI.
+The CLI currently requires a full URL for navigation through `page act`, for example `jevb page act demo 'Open https://www.baidu.com'`. The browser extension additionally maps known site names such as “baidu” to URLs. That mapping is not yet implemented in the CLI.
 
 ### Configure a model
 
@@ -110,33 +112,33 @@ Its four `references/` guides cover commands, snapshots, sessions/authentication
 Open a browser, then describe each action with `page act`:
 
 ```bash
-jev-browser --session demo --headed page open https://example.com
-jev-browser --session demo page act 'Read the Example Domain heading'
-jev-browser --session demo page act 'Click the Learn more link'
-jev-browser --session demo page act 'Go back to the previous page'
+jev-browser page open demo --headed https://example.com
+jev-browser page act demo 'Read the Example Domain heading'
+jev-browser page act demo 'Click the Learn more link'
+jev-browser page act demo 'Go back to the previous page'
 jev-browser session close demo
 ```
 
-`--headed` shows the browser window. Reuse the same `--session` name to keep working in the same browser.
+`--headed` shows the browser window. Place the same session name after the action to keep working in the same browser.
 
-Finish with `jev-browser session close demo`; success prints `Closed session: demo`. Without a session argument or flag, the CLI uses `JEV_BROWSER_SESSION` or falls back to `default`. The session argument, `--session`, and `--all` are mutually exclusive. Closing a session attached to your Chrome only disconnects the controller.
+Finish with `jev-browser session close demo`; success prints `Closed session: demo`. Supply a session name, or use `session close --all` to close all sessions. A session name and `--all` are mutually exclusive. Closing a session attached to your Chrome only disconnects the controller.
 
 For your own site, open its URL first and use the actual control names. These are independent examples for pages containing the named controls:
 
 ```bash
-jev-browser --session hotel page act 'Fill the "Hotel keyword" field with "Garden"'
-jev-browser --session hotel page act 'Click the Search hotels button'
-jev-browser --session hotel page act 'Click Book in the Standard King Room section'
-jev-browser --session hotel page act 'Check the I agree to the booking terms checkbox'
+jev-browser page act hotel 'Fill the "Hotel keyword" field with "Garden"'
+jev-browser page act hotel 'Click the Search hotels button'
+jev-browser page act hotel 'Click Book in the Standard King Room section'
+jev-browser page act hotel 'Check the I agree to the booking terms checkbox'
 ```
 
-Each `page act` performs one operation, including input followed by submission, such as `page act 'Search for jev'`. Jev judges the action, input field, value, clearing, and submission in parallel. Split other independent workflows into separate calls. Quote complex values and name the section when controls share a label. `executed` means the operation completed; verify business outcomes with page or API assertions.
+Each `page act` performs one operation, including input followed by submission, such as `page act demo 'Search for jev'`. Jev judges the action, input field, value, clearing, and submission in parallel. Split other independent workflows into separate calls. Quote complex values and name the section when controls share a label. `executed` means the operation completed; verify business outcomes with page or API assertions.
 
 Uncertain decisions display the page, target, value, clearing/submission behavior, and reason for confirmation. In a terminal, enter `y` to execute or anything else to cancel. JSON and non-interactive calls return `needs_confirmation` with a confirmation ID and commands:
 
 ```bash
-jev-browser --session demo page act --confirm <confirmation-id>
-jev-browser --session demo page act --cancel <confirmation-id>
+jev-browser page act demo --confirm <confirmation-id>
+jev-browser page act demo --cancel <confirmation-id>
 ```
 
 IDs are bound to the original session, expire after five minutes, and can be used once. Confirmation rechecks the page and target before executing the displayed plan. Dry runs never execute or create executable confirmation IDs. Explicit and stdin values are hidden in output; pending plans are temporarily saved in owner-only files and removed on confirmation or cancellation.
@@ -145,16 +147,16 @@ IDs are bound to the original session, expire after five minutes, and can be use
 
 ```bash
 # Specify the action; let the model select its target
-jev-browser --session hotel page act --op fill 'Guest name field' --value 'Alex'
+jev-browser page act hotel --op fill 'Guest name field' --value 'Alex'
 
 # Preview the target without acting, and return JSON
-jev-browser --session hotel page act --op click 'Confirm booking button' --dry-run --json
+jev-browser page act hotel --op click 'Confirm booking button' --dry-run --json
 
 # Pass a sensitive value through stdin
-printf '%s' "$TEST_PASSWORD" | jev-browser --session demo page act --op fill 'Password field' --value-stdin
+printf '%s' "$TEST_PASSWORD" | jev-browser page act demo --op fill 'Password field' --value-stdin
 ```
 
-When you know the selector, use commands such as `element click '#submit'` or `element fill '#name' 'Alex'` directly. After login, these execute without calling the model. Run `jev-browser --help` or `jev-browser help` for more options.
+When you know the selector, use commands such as `element click demo '#submit'` or `element fill demo '#name' 'Alex'` directly. After login, these execute without calling the model. Run `jev-browser --help` or `jev-browser help` for more options.
 
 ## 3. How it works
 
@@ -164,7 +166,7 @@ When you know the selector, use commands such as `element click '#submit'` or `e
 
 Low-probability decisions require confirmation. Missing or stale targets stop execution. Targets are also rechecked between input and submission. Partially executed operations and unknown outcomes are never automatically replayed.
 
-For `page act 'Search for jev'`, independent questions share one request, and code consumes only the relevant branches. Every relevant uncertain decision requires confirmation. Explicit `--op fill/type` retains replacement/append behavior without automatically pressing Enter.
+For `page act demo 'Search for jev'`, independent questions share one request, and code consumes only the relevant branches. Every relevant uncertain decision requires confirmation. Explicit `--op fill/type` retains replacement/append behavior without automatically pressing Enter.
 
 ## 4. Development
 

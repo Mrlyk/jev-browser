@@ -5,9 +5,9 @@ Use when inspecting structure, disambiguating similar controls, or recovering af
 ## Choose the observation
 
 ```bash
-jev-browser --session task-demo --json page snapshot
-jev-browser --session task-demo --json page snapshot -i
-jev-browser --session task-demo --json page snapshot -s '#guest-section'
+jev-browser page snapshot task-demo --json
+jev-browser page snapshot task-demo --json -i
+jev-browser page snapshot task-demo --json -s '#guest-section'
 ```
 
 The full snapshot preserves region and ancestor context. `-i` is useful for a small interactive-control view; it may omit context needed to distinguish identical labels. `-s` scopes observation to a verified CSS selector. These options are for explicit observation; `page act` builds and validates its own snapshot.
@@ -41,7 +41,7 @@ Before using a stored ref after navigation, tab/frame changes, or a rerender, ob
 For example, after confirming `#guest-section` from the actual page:
 
 ```bash
-jev-browser --session task-demo --json page act --op click 'Confirm button' --scope '#guest-section' --dry-run
+jev-browser page act task-demo --json --op click 'Confirm button' --scope '#guest-section' --dry-run
 ```
 
 `resolved` means the preview identified a target. It is not an execution token; the next real `page act` observes and checks the page again.

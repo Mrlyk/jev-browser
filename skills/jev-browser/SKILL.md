@@ -9,22 +9,22 @@ Use this CLI as the browser execution tool for the user's task. You plan the wor
 
 ## Start
 
-- Install **`jev-browser-cli`** from npm; invoke **`jevb`** or **`jev-browser`**. Use `<resource> <action> [object]`, such as `page act` and `session close task-demo`; legacy top-level actions are rejected. The npm package named `jev-browser` is a different project. Check `jevb --version` and `jevb --help`.
+- Install **`jev-browser-cli`** from npm; invoke **`jevb`** or **`jev-browser`**. Use `<resource> <action> <session> [object]` for browser operations, such as `page act task-demo "Search for jev"` and `session close task-demo`; legacy top-level actions are rejected. The npm package named `jev-browser` is a different project. Check `jevb --version` and `jevb --help`.
 - Node.js 22+ is required. The published binary targets macOS Apple Silicon; other platforms require a source build. The browser executor is bundled.
 - `page act` resolves each provider from environment variables first, then saved credentials; TypeSafe wins across providers. For local Key setup and verification, read [sessions-auth.md](references/sessions-auth.md). Do not expose keys or change providers to bypass an error. Commands prompt for login when no model key is configured; help, version and model credential management remain available. Atomic execution makes no model call after login.
 
 ## Operate one step at a time
 
-1. Choose a unique session for the task. Replace `task-demo` below and use the same session on every command; serialize its operations.
-2. Use `page act --op` when you know the action, and `--value` for an exact known value. Otherwise give `page act` one instruction. Independent action, target, input, clear, and submit questions run together; entering text and submitting that field can form one operation. Other multi-step tasks must be split by the caller.
+1. Choose a unique session for the task. Place its name immediately after the action, replacing `task-demo` below; never use `--session` or rely on a default. Global utilities such as `session list`, model `auth login`, and `browser install` need no session; serialize its operations.
+2. Use `page act <session> --op` when you know the action, and `--value` for an exact known value. Otherwise give `page act` one instruction. Independent action, target, input, clear, and submit questions run together; entering text and submitting that field can form one operation. Other multi-step tasks must be split by the caller.
 3. Inspect `--json` results and the exit code, then verify the expected page state before the next step. A reliable current selector can use an atomic command without a model call.
 4. Close the task's own session when done. For CDP, browser-launch restrictions, or login reuse, read [sessions-auth.md](references/sessions-auth.md).
 
 ```bash
-jev-browser --session task-demo --json page open https://example.com
-jev-browser --session task-demo --json page act --op get_text 'Example Domain heading'
-jev-browser --session task-demo --json page get title
-jev-browser --session task-demo --json session close
+jev-browser page open task-demo --json https://example.com
+jev-browser page act task-demo --json --op get_text 'Example Domain heading'
+jev-browser page get task-demo --json title
+jev-browser session close task-demo --json
 ```
 
 ## Keep execution boundaries

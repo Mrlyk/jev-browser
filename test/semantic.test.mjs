@@ -130,12 +130,12 @@ test('日期填写选择整个原生控件，排除内部年月日片段', () =>
 });
 
 test('参数解析保留值、全局作用域，并防止把参数值 act 当命令', () => {
-  const p = parseArgs(['--session', 'act', 'page', 'act', '--op', 'fill', '姓名', '--value', '--json', '--json']);
+  const p = parseArgs(['page', 'act', 'act', '--op', 'fill', '姓名', '--value', '--json', '--json']);
   assert.equal(p.session, 'act'); assert.equal(p.options.value, '--json'); assert.equal(p.json, true);
-  assert.equal(parseArgs(['element', 'fill', '#name', 'act']).name, 'fill');
-  assert.equal(parseArgs(['--restore', 'saved-login', 'page', 'snapshot']).name, 'snapshot');
-  assert.equal(parseArgs(['--restore', 'page', 'act', '--op', 'click', '按钮']).name, 'act');
-  assert.throws(() => parseArgs(['page', 'act', '按钮', '--min-probability', 'oops']), { code: 'INVALID_ARGUMENT' });
+  assert.equal(parseArgs(['element', 'fill', 'demo', '#name', 'act']).name, 'fill');
+  assert.equal(parseArgs(['--restore', 'saved-login', 'page', 'snapshot', 'demo']).name, 'snapshot');
+  assert.equal(parseArgs(['--restore', 'page', 'act', 'demo', '--op', 'click', '按钮']).name, 'act');
+  assert.throws(() => parseArgs(['page', 'act', 'demo', '按钮', '--min-probability', 'oops']), { code: 'INVALID_ARGUMENT' });
 });
 
 test('执行未知不自动再次调用', async () => {
@@ -231,8 +231,8 @@ test('填写后页面变化或提交失败报告部分执行，不重试', async
 });
 
 test('确认编号不可同时修改计划或阈值', () => {
-  assert.equal(parseArgs(['page', 'act', '--confirm', 'jev-id']).options.confirm, 'jev-id');
-  assert.equal(parseArgs(['page', 'act', '--cancel', 'jev-id']).options.cancel, 'jev-id');
+  assert.equal(parseArgs(['page', 'act', 'demo', '--confirm', 'jev-id']).options.confirm, 'jev-id');
+  assert.equal(parseArgs(['page', 'act', 'demo', '--cancel', 'jev-id']).options.cancel, 'jev-id');
   for (const extra of [['搜索别的内容'], ['--value', 'other'], ['--dry-run'], ['--scope', '#other'], ['--min-probability', '0'], ['--cancel', 'id']])
-    assert.throws(() => parseArgs(['page', 'act', '--confirm', 'jev-id', ...extra]), { code: 'INVALID_ARGUMENT' });
+    assert.throws(() => parseArgs(['page', 'act', 'demo', '--confirm', 'jev-id', ...extra]), { code: 'INVALID_ARGUMENT' });
 });

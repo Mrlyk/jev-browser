@@ -54,9 +54,20 @@ export const existingGroups = {
   device: '设备', plugin: '执行器插件', webmcp: '页面提供的工具',
 };
 
+// Session names belong to browser operations; account/package utilities stay global.
+export function requiresSession(args: string[]): boolean {
+  const [resource, action, target] = args;
+  if (resource === 'session') return ['close', 'inspect', 'info'].includes(action);
+  if (resource === 'browser') return ['connect', 'configure'].includes(action);
+  if (resource === 'state') return ['save', 'load'].includes(action);
+  if (resource === 'auth') return action === 'login' && !!target && !target.startsWith('-') && !['typesafe', 'openrouter'].includes(target);
+  return ['page', 'element', 'tab', 'window', 'frame', 'keyboard', 'touch', 'cookie', 'console', 'script', 'approval',
+    'network', 'storage', 'mouse', 'dialog', 'stream', 'trace', 'profiler', 'record', 'clipboard', 'device', 'webmcp'].includes(resource);
+}
+
 const usages: Record<string, string> = {
   'session list': '[--json]', 'session ls': '[--json]', 'session current': '[--json]',
-  'session inspect': '[会话名] [--json]', 'session info': '[会话名] [--json]',
+  'session inspect': '[--json]', 'session info': '[--json]',
   'session id': '[--scope worktree|cwd|git-root] [--prefix <前缀>]',
   'tab list': '[--json]', 'tab ls': '[--json]', 'tab create': '[URL] [--label <名称>]',
   'tab switch': '<标签页ID或名称>', 'tab close': '[标签页ID或名称]',
@@ -71,9 +82,9 @@ const usages: Record<string, string> = {
 
 export function groupHelp(name: string): string {
   const group = commandGroups[name];
-  return `用法：jev-browser ${name} <动作> [对象] [选项]\n\n${group.description}\n\n动作：\n` +
+  return `用法：jev-browser ${name} <动作> [会话名] [对象] [选项]\n\n${group.description}\n\n动作：\n` +
     Object.keys(group.actions).map(action => `  ${action}`).join('\n') +
-    `\n\n使用 jev-browser ${name} <动作> --help 查看参数。全局 --session <name> 选择操作会话。\n`;
+    `\n\n需要浏览器会话的动作使用：jev-browser ${name} <动作> <会话名> [对象] [选项]。\n使用 jev-browser ${name} <动作> --help 查看参数。\n`;
 }
 
 export function normalizeCommand(args: string[]): { args: string[]; path?: string; help?: string } {
@@ -81,7 +92,7 @@ export function normalizeCommand(args: string[]): { args: string[]; path?: strin
   if (args[0] === 'help' && args[1]) return normalizeCommand([...args.slice(1), '--help']);
   const [resource, action, ...rest] = args;
   if (!resource || resource === 'help') return { args };
-  if (Object.hasOwn(existingGroups, resource)) return { args: action ? args : [resource, '--help'] };
+  if (Object.hasOwn(existingGroups, resource)) return { args: action ? args : [resource, '--help'], path: action ? `${resource} ${action}` : resource };
   if (!Object.hasOwn(commandGroups, resource)) {
     const replacement = Object.entries(commandGroups).flatMap(([group, spec]) =>
       Object.entries(spec.actions).filter(([, target]) => target[0] === resource).map(([verb]) => `${group} ${verb}`))[0];
@@ -98,10 +109,10 @@ export function normalizeCommand(args: string[]): { args: string[]; path?: strin
   }
   const path = `${resource} ${action}`;
   if (Object.hasOwn(usages, path) && rest.some(arg => ['--help', '-h'].includes(arg)))
-    return { args: ['help'], help: `用法：jev-browser ${path} ${usages[path]}\n\n${group.description}。使用全局 --session <name> 选择浏览器会话。\n` };
+    return { args: ['help'], help: `用法：jev-browser ${path} ${requiresSession(args) ? '<会话名> ' : ''}${usages[path]}\n\n${group.description}。\n` };
   if (((resource === 'tab' || resource === 'frame') && action === 'switch') &&
     (!rest.length || rest[0].startsWith('-')) && !rest.some(arg => ['--help', '-h'].includes(arg)))
-    throw new JevError('NEEDS_INPUT', `缺少目标。用法：jev-browser ${resource} switch <对象>。`);
+    throw new JevError('NEEDS_INPUT', `缺少目标。用法：jev-browser ${resource} switch <会话名> <对象>。`);
   return { args: [...target, ...rest], path };
 }
 

@@ -8,6 +8,7 @@ const help = `账号：
   jev-browser auth login [typesafe|openrouter] --with-token  从标准输入登录
   jev-browser auth status [--json]                查看登录状态
   jev-browser auth logout typesafe|openrouter      删除本地 Key
+  jev-browser auth login <会话名> <网站账号名>      在指定会话登录已保存的网站账号
 `;
 
 export async function ensureLogin(): Promise<void> {

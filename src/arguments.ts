@@ -1,6 +1,6 @@
 import { operation, type ActOptions } from './actions.js';
 import { JevError } from './errors.js';
-import { commandGroups, normalizeCommand } from './command-tree.js';
+import { commandGroups, normalizeCommand, requiresSession } from './command-tree.js';
 
 // Matches the pinned executor's global options. Command-specific arguments pass through.
 const valued = new Set(`--session --restore-save --restore-check-url --restore-check-text --restore-check-fn
@@ -20,6 +20,8 @@ const commands = new Set(`act help open goto navigate back forward reload read c
 
 function globalLength(args: string[], i: number, beforeCommand = true): number {
   if (args[i] === undefined) return 0;
+  if (args[i] === '--session' || args[i].startsWith('--session=')) throw new JevError('INVALID_ARGUMENT', '--session 已移除，请使用 jev-browser <资源> <动作> <会话名>，例如 jev-browser page act demo "搜索 jev" 或 jev-browser session close demo。');
+  if (args[i] === '--namespace' || args[i].startsWith('--namespace=')) throw new JevError('INVALID_ARGUMENT', 'jev-browser 使用独立命名空间，请通过动作后的会话名区分会话。');
   if (valued.has(args[i])) {
     if (args[i + 1] === undefined) throw new JevError('INVALID_ARGUMENT', `${args[i]} 缺少参数。`);
     return 2;
@@ -33,20 +35,30 @@ function globalLength(args: string[], i: number, beforeCommand = true): number {
   return 0;
 }
 
-function parseSessionArgs(args: string[], action: string): { rest: string[]; session?: string; all?: boolean } {
-  if (args.some(arg => arg === '--help' || arg === '-h')) return { rest: args };
-  const rest: string[] = [];
-  let session: string | undefined, all = false;
+function validateManagement(args: string[], action: string): void {
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--all' && action === 'close') { all = true; rest.push(args[i]); continue; }
+    if (args[i] === '--all' && action === 'close') continue;
     const n = globalLength(args, i, false);
-    if (n) { rest.push(...args.slice(i, i + n)); i += n - 1; continue; }
-    if (args[i].startsWith('-')) throw new JevError('INVALID_ARGUMENT', `未知 session ${action} 参数：${args[i]}。用法：jev-browser session ${action} [会话名]。`);
-    if (session !== undefined) throw new JevError('INVALID_ARGUMENT', `session ${action} 只接受一个会话名。用法：jev-browser session ${action} demo。`);
-    if (!/^[a-zA-Z0-9_-]{1,48}$/.test(args[i])) throw new JevError('INVALID_SESSION', '会话名应为 1–48 个字母、数字、下划线或短横线。');
-    session = args[i];
+    if (n) { i += n - 1; continue; }
+    throw new JevError('INVALID_ARGUMENT', `session ${action} 不接受额外参数。用法：jev-browser session ${action} <会话名>。`);
   }
-  return { rest, session, all };
+}
+
+function extractSession(args: string[]) {
+  const scoped = requiresSession(args);
+  const help = !args[1] || args.some(arg => ['--help', '-h'].includes(arg));
+  const all = args[0] === 'session' && args[1] === 'close' && args[2] === '--all';
+  if (!scoped || help || all) return { args, scoped, session: undefined };
+  const session = args[2];
+  if (session?.startsWith('--session') || session?.startsWith('--namespace')) globalLength(args, 2, false);
+  const usage = `jev-browser ${args[0]} ${args[1]} <会话名> [对象] [选项]`;
+  if (!session || session.startsWith('-'))
+    throw new JevError('NEEDS_INPUT', `请在动作后填写会话名。用法：${usage}。`);
+  if (!/^[a-zA-Z0-9_-]{1,48}$/.test(session))
+    throw new JevError('INVALID_SESSION', `会话名应为 1–48 个字母、数字、下划线或短横线。用法：${usage}。`);
+  if (args[0] === 'auth' && (!args[3] || args[3].startsWith('-')))
+    throw new JevError('NEEDS_INPUT', '网站登录还需要已保存的账号名。用法：jev-browser auth login <会话名> <账号名>。');
+  return { args: [...args.slice(0, 2), ...args.slice(3)], scoped, session };
 }
 
 export function parseArgs(args: string[]) {
@@ -61,12 +73,20 @@ export function parseArgs(args: string[]) {
   if (Object.hasOwn(commandGroups, commandArgs[0])) {
     for (let n; (n = globalLength(commandArgs, 1, false));) globals.push(...commandArgs.splice(1, n));
   }
-  const normalized = normalizeCommand(commandArgs);
-  const [name, ...parameters] = normalized.args;
-  const inspecting = name === 'session' && parameters[0] === 'info';
-  const selected = name === 'close' ? parseSessionArgs(parameters, 'close') :
-    inspecting ? parseSessionArgs(parameters.slice(1), 'inspect') : undefined;
-  const rest = selected ? [...(inspecting ? ['info'] : []), ...selected.rest] : parameters;
+  const publicArgs = commandArgs[0] === 'help' && commandArgs[1] ? [...commandArgs.slice(1), '--help'] : commandArgs;
+  // Validate resource/action names before consuming an operand as a session.
+  const groupHelp = !publicArgs[1] || ['--help', '-h'].includes(publicArgs[1]);
+  if (!groupHelp) normalizeCommand([...publicArgs.slice(0, 2), '--help']);
+  const selected = extractSession(publicArgs);
+  const normalized = normalizeCommand(selected.args);
+  const [name, ...rest] = normalized.args;
+  const showingHelp = !!normalized.help || rest.some(arg => ['--help', '-h'].includes(arg));
+  if (!showingHelp && name === 'close') {
+    validateManagement(rest, 'close');
+    if (selected.session && rest.includes('--all'))
+      throw new JevError('INVALID_ARGUMENT', '会话名和 --all 不能同时使用。用法：jev-browser session close <会话名> 或 jev-browser session close --all。');
+  }
+  if (!showingHelp && name === 'session' && rest[0] === 'info') validateManagement(rest.slice(1), 'inspect');
   const options: ActOptions = { instruction: '', probability: 0.85, margin: 0.2 };
   if (name === 'act' && !rest.some(arg => ['--help', '-h'].includes(arg))) {
     const words: string[] = [];
@@ -103,20 +123,16 @@ export function parseArgs(args: string[]) {
     if (globals.some(x => ['--max-output', '--content-boundaries', '--confirm-interactive'].includes(x)))
       throw new JevError('INVALID_ARGUMENT', 'act 不接受截断输出、内容包裹或交互确认参数。');
   }
-  const routing = name === 'act' ? globals : args;
-  let session = process.env.JEV_BROWSER_SESSION || 'default';
-  let explicitSession = false;
-  for (let i = 0; i < routing.length; i++) {
-    if (routing[i] === '--namespace') throw new JevError('INVALID_ARGUMENT', 'jev-browser 使用独立命名空间；请用 --session 区分会话。');
-    if (routing[i] === '--session') { session = routing[++i]; explicitSession = true; }
-    else if (valued.has(routing[i])) i++;
+  // Native operations retain their arguments; reject legacy routing flags before dispatch.
+  if (name !== 'act') {
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === '--') break;
+      const n = globalLength(rest, i, false);
+      if (n) i += n - 1;
+    }
   }
-  if (selected?.session !== undefined && explicitSession)
-    throw new JevError('INVALID_ARGUMENT', `会话名与 --session 不能同时使用。用法：jev-browser session ${inspecting ? 'inspect' : 'close'} demo。`);
-  if (selected?.all && (selected.session !== undefined || explicitSession))
-    throw new JevError('INVALID_ARGUMENT', '--all 不能与具体会话同时使用。请选择：jev-browser session close demo 或 jev-browser session close --all。');
-  session = selected?.session ?? session;
-  // An explicit final session overrides project/user configuration as well.
+  const routing = name === 'act' ? globals : [...globals, ...rest];
+  const session = selected.session ?? 'default';
   return { name, rest, options, session, globals: [...globals, '--session', session], json: routing.includes('--json'),
-    help: normalized.help, commandPath: normalized.path };
+    help: normalized.help, commandPath: normalized.path, sessionRequired: selected.scoped };
 }

@@ -39,7 +39,9 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 
 ### CLI 命令
 
-采用 `jevb <资源> <动作> [对象] [选项]`。`--session <name>` 选择浏览器会话；管理会话时直接把名字放在动作后面，例如 `jevb session close demo`。
+采用 `jevb <资源> <动作> <会话名> [对象] [选项]`，例如 `jevb page act demo "搜索 jev"`、`jevb session close demo`。会话名必填，旧的 `--session` 写法会提示迁移；不会使用环境变量或默认会话替代。
+
+`session list`、`auth login/status/logout`、`browser install/inspect/doctor`、`skill`、`profile` 等公共命令不需要会话名。`browser connect/configure`、`state save/load` 需要会话名；网站账号登录使用 `auth login <会话名> <账号名>`。下表省略浏览器动作中的会话参数。
 
 | 资源 | 动作与用途 |
 | --- | --- |
@@ -62,8 +64,8 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 jevb --help
 jevb page --help
 jevb page open --help
-jevb --session demo --headed page open https://www.baidu.com
-jevb --session demo page act '点击搜索框'
+jevb page open demo --headed https://www.baidu.com
+jevb page act demo '点击搜索框'
 jevb session inspect demo
 jevb session close demo
 ```
@@ -74,7 +76,7 @@ jevb session close demo
 
 `page act` 将自然语言交给 Jev 判断，再调用底层浏览器动作；`page open` 和 `element click` 等确定性命令供已知网址或选择器的脚本直接执行，省去模型判断。两类入口共用执行器，自然语言操作也可以完成导航，无须固定先执行 `page open`。
 
-目前 CLI 的 `page act` 打开网站需要完整 URL，例如 `jevb --session demo page act '打开 https://www.baidu.com'`。插件另外实现了网站名称映射，因此能识别“打开 baidu”；CLI 尚未提供这层映射。
+目前 CLI 的 `page act` 打开网站需要完整 URL，例如 `jevb page act demo '打开 https://www.baidu.com'`。插件另外实现了网站名称映射，因此能识别“打开 baidu”；CLI 尚未提供这层映射。
 
 ### 配置模型
 
@@ -110,33 +112,33 @@ export OPENROUTER_API_KEY="你的 OpenRouter Key"
 打开浏览器后，使用 `page act` 描述要执行的动作：
 
 ```bash
-jev-browser --session demo --headed page open https://example.com
-jev-browser --session demo page act '读取 Example Domain 标题'
-jev-browser --session demo page act '点击 Learn more 链接'
-jev-browser --session demo page act '返回上一页'
+jev-browser page open demo --headed https://example.com
+jev-browser page act demo '读取 Example Domain 标题'
+jev-browser page act demo '点击 Learn more 链接'
+jev-browser page act demo '返回上一页'
 jev-browser session close demo
 ```
 
-`--headed` 显示浏览器窗口；使用相同的 `--session` 名称可连续操作同一个浏览器。
+`--headed` 显示浏览器窗口；在动作后填写相同的会话名可连续操作同一个浏览器。
 
-用完后执行 `jev-browser session close demo`，成功时显示 `Closed session: demo`。不指定会话时使用 `JEV_BROWSER_SESSION`，未设置则使用 `default`。会话名、`--session` 和 `--all` 不能混用。连接自己的 Chrome 时，关闭会话只断开控制连接。
+用完后执行 `jev-browser session close demo`，成功时显示 `Closed session: demo`。会话名必填，或使用 `session close --all` 关闭全部会话；会话名不能与 `--all` 混用。连接自己的 Chrome 时，关闭会话只断开控制连接。
 
 操作自己的业务页面时，可用 `page open` 打开地址，再描述页面中的实际控件。以下是独立操作示例：
 
 ```bash
-jev-browser --session hotel page act '在“酒店关键词”输入框填写“花园”'
-jev-browser --session hotel page act '点击搜索酒店按钮'
-jev-browser --session hotel page act '点击标准大床房区域的预订按钮'
-jev-browser --session hotel page act '勾选同意预订须知'
+jev-browser page act hotel '在“酒店关键词”输入框填写“花园”'
+jev-browser page act hotel '点击搜索酒店按钮'
+jev-browser page act hotel '点击标准大床房区域的预订按钮'
+jev-browser page act hotel '勾选同意预订须知'
 ```
 
-一次 `page act` 执行一次操作，支持 `page act '搜索 jev'` 这样的输入并提交；其他独立多步流程按顺序调用。Jev 并行判断动作、输入框、输入内容、是否清空和是否回车。复杂的填写内容可用引号标明，同名控件加上所在区域。返回 `executed` 表示操作完成，业务是否成功仍需检查页面或接口结果。
+一次 `page act` 执行一次操作，支持 `page act demo '搜索 jev'` 这样的输入并提交；其他独立多步流程按顺序调用。Jev 并行判断动作、输入框、输入内容、是否清空和是否回车。复杂的填写内容可用引号标明，同名控件加上所在区域。返回 `executed` 表示操作完成，业务是否成功仍需检查页面或接口结果。
 
 不够确定时，CLI 展示页面、目标、输入内容、是否清空和提交，以及需要确认的原因。终端中输入 `y` 执行，其他输入取消。`--json` 或非交互调用返回 `needs_confirmation` 和确认编号，按返回的命令继续：
 
 ```bash
-jev-browser --session demo page act --confirm <确认编号>
-jev-browser --session demo page act --cancel <确认编号>
+jev-browser page act demo --confirm <确认编号>
+jev-browser page act demo --cancel <确认编号>
 ```
 
 确认编号限原会话使用，5 分钟内有效，只能处理一次。确认会复核页面和目标，执行已展示的计划。`--dry-run` 始终不执行，也不创建可执行的确认编号。`--value` 和标准输入的内容不会回显；待确认计划临时保存在仅当前用户可读的文件中，确认或取消后删除。
@@ -145,16 +147,16 @@ jev-browser --session demo page act --cancel <确认编号>
 
 ```bash
 # 已知动作类型时，只让模型选择目标
-jev-browser --session hotel page act --op fill '入住人姓名输入框' --value '张三'
+jev-browser page act hotel --op fill '入住人姓名输入框' --value '张三'
 
 # 预览选择，不执行动作；用 JSON 输出结果
-jev-browser --session hotel page act --op click '确认预订按钮' --dry-run --json
+jev-browser page act hotel --op click '确认预订按钮' --dry-run --json
 
 # 敏感值从标准输入读取
-printf '%s' "$TEST_PASSWORD" | jev-browser --session demo page act --op fill '密码输入框' --value-stdin
+printf '%s' "$TEST_PASSWORD" | jev-browser page act demo --op fill '密码输入框' --value-stdin
 ```
 
-已知选择器时，也可直接使用 `element click '#submit'`、`element fill '#name' '张三'` 等命令，登录后执行时不调用模型。更多参数见 `jev-browser --help` 和 `jev-browser help`。
+已知选择器时，也可直接使用 `element click demo '#submit'`、`element fill demo '#name' '张三'` 等命令，登录后执行时不调用模型。更多参数见 `jev-browser --help` 和 `jev-browser help`。
 
 ## 3. 实现原理简述
 
@@ -164,7 +166,7 @@ printf '%s' "$TEST_PASSWORD" | jev-browser --session demo page act --op fill '�
 
 相关判断未达到阈值时，工具等待确认；没有有效目标或页面已变化时停止执行。输入与提交之间也会复核目标，已部分执行或结果未知时不自动重放。
 
-例如 `page act '搜索 jev'`，在一次请求中并行判断各个操作要素，只使用相关分支的结果。任何相关判断不够确定都会进入确认流程。指定 `--op fill/type` 时保留明确的清空/追加行为，不自动回车。
+例如 `page act demo '搜索 jev'`，在一次请求中并行判断各个操作要素，只使用相关分支的结果。任何相关判断不够确定都会进入确认流程。指定 `--op fill/type` 时保留明确的清空/追加行为，不自动回车。
 
 ## 4. 开发说明
 
