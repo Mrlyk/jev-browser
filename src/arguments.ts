@@ -37,7 +37,6 @@ function globalLength(args: string[], i: number, beforeCommand = true): number {
 
 function validateManagement(args: string[], action: string): void {
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--all' && action === 'close') continue;
     const n = globalLength(args, i, false);
     if (n) { i += n - 1; continue; }
     throw new JevError('INVALID_ARGUMENT', `session ${action} 不接受额外参数。用法：jev-browser session ${action}${action === 'clear' ? ' [--json]' : ' <会话名>'}。`);
@@ -47,8 +46,9 @@ function validateManagement(args: string[], action: string): void {
 function extractSession(args: string[]) {
   const scoped = requiresSession(args);
   const help = !args[1] || args.some(arg => ['--help', '-h'].includes(arg));
-  const all = args[0] === 'session' && args[1] === 'close' && args[2] === '--all';
-  if (!scoped || help || all) return { args, scoped, session: undefined };
+  if (!scoped || help) return { args, scoped, session: undefined };
+  if (args[0] === 'session' && args[1] === 'close' && args[2] === '--all')
+    throw new JevError('INVALID_ARGUMENT', 'jev-browser session close 不支持 --all，请使用 jev-browser session clear 关闭全部会话。');
   const session = args[2];
   if (session?.startsWith('--session') || session?.startsWith('--namespace')) globalLength(args, 2, false);
   const usage = `jev-browser ${args[0]} ${args[1]} <会话名> [对象] [选项]`;
@@ -82,11 +82,7 @@ export function parseArgs(args: string[]) {
   const [name, ...rest] = normalized.args;
   const showingHelp = !!normalized.help || rest.some(arg => ['--help', '-h'].includes(arg));
   if (!showingHelp && normalized.path === 'session clear') validateManagement(selected.args.slice(2), 'clear');
-  if (!showingHelp && name === 'close') {
-    validateManagement(rest, 'close');
-    if (selected.session && rest.includes('--all'))
-      throw new JevError('INVALID_ARGUMENT', '会话名和 --all 不能同时使用。用法：jev-browser session close <会话名> 或 jev-browser session close --all。');
-  }
+  if (!showingHelp && normalized.path === 'session close') validateManagement(rest, 'close');
   if (!showingHelp && name === 'session' && rest[0] === 'info') validateManagement(rest.slice(1), 'inspect');
   const options: ActOptions = { instruction: '', probability: 0.85, margin: 0.2 };
   if (name === 'act' && !rest.some(arg => ['--help', '-h'].includes(arg))) {

@@ -88,6 +88,8 @@ jevb session close demo
 | `browser connect` | 连接已开启调试端口的浏览器 | `jevb browser connect demo 9222` |
 | `state save` | 保存登录状态 | `jevb state save demo auth.json` |
 
+关闭单个会话使用 `jevb session close <会话名>`；关闭全部运行中的会话使用 `jevb session clear`，无需会话名。`session close` 不接受 `--all`。两条命令均可添加 `--json` 获取结构化结果。
+
 完整命令分组见 `jevb --help`。更多示例见[命令指南](skills/jev-browser/references/commands.md)，页面引用和会话复用见[快照指南](skills/jev-browser/references/snapshot-refs.md)、[会话指南](skills/jev-browser/references/sessions-auth.md)。
 
 ### 预览与确认

@@ -23,7 +23,7 @@ function fixture(t) {
     env: { ...env, ...extraEnv }, encoding: 'utf8', timeout: 15000, killSignal: 'SIGKILL',
   });
   t.after(() => {
-    if (existsSync(join(root, 'run'))) run(['session', 'close', '--all'], { TYPESAFE_API_KEY: 'local-test-placeholder' });
+    if (existsSync(join(root, 'run'))) run(['session', 'clear'], { TYPESAFE_API_KEY: 'local-test-placeholder' });
     rmSync(root, { recursive: true, force: true });
   });
   return { root, run };
@@ -32,7 +32,7 @@ function fixture(t) {
 test('session close rejects extra operands, unknown options and conflicts before login or dispatch', t => {
   const { root, run } = fixture(t);
   for (const name of ['session close']) {
-    for (const tail of [['demo', 'other'], ['--all', 'demo'], ['demo', '--sesion'], ['--all', '--unknown'],
+    for (const tail of [['--all'], ['demo', '--all'], ['demo', 'other'], ['--all', 'demo'], ['demo', '--sesion'], ['--all', '--unknown'],
       ['demo', '--session', 'other'], ['--session', 'demo', '--all']]) {
       const result = run([...name.split(' '), ...tail]);
       assert.equal(result.status, 1, result.stderr);
@@ -58,7 +58,8 @@ test('session close accepts targets and flags, while legacy entry points fail', 
     ['session', 'cloase', 'demo'], ['session', 'close', 'demo', '--session', 'other']])
     assert.throws(() => parseArgs(args), { code: 'INVALID_ARGUMENT' });
   assert.throws(() => parseArgs(['session', 'close', '../demo']), { code: 'INVALID_SESSION' });
-  assert.doesNotThrow(() => parseArgs(['session', 'close', '--all']));
+  assert.throws(() => parseArgs(['session', 'close', '--all']), error =>
+    error.code === 'INVALID_ARGUMENT' && /session clear/.test(error.message));
   assert.doesNotThrow(() => parseArgs(['session', 'close', 'demo', '--help']));
 });
 
@@ -67,11 +68,12 @@ test('close help is available without login and explains session selection', t =
   const result = run(['--help']);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /close <会话名>/);
-  assert.match(result.stdout, /close --all/);
+  assert.match(result.stdout, /session clear/);
+  assert.doesNotMatch(result.stdout, /--all/);
   const subcommand = run(['session', 'close', 'demo', '--help']);
   assert.equal(subcommand.status, 0, subcommand.stderr);
   assert.match(subcommand.stdout, /jev-browser session close demo/);
-  assert.doesNotMatch(subcommand.stdout, /Browser closed|Closed session:/);
+  assert.doesNotMatch(subcommand.stdout, /Browser closed|Closed session:|--all/);
   assert.equal(run(['help', 'session', 'close']).stdout, subcommand.stdout);
 });
 

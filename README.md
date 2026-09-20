@@ -90,6 +90,8 @@ Replace selectors and tab IDs with values from your page. Use `jevb <resource> <
 | `browser connect` | Connect to a browser's open debug port | `jevb browser connect demo 9222` |
 | `state save` | Save login state | `jevb state save demo auth.json` |
 
+Use `jevb session close <session>` to close one session, or `jevb session clear` to close all running sessions without a session name. `session close` does not accept `--all`. Add `--json` to either command for structured output.
+
 Run `jevb --help` for all command groups. See the [command guide](skills/jev-browser/references/commands.md) for more examples.
 
 For refs and session reuse, read the [snapshot guide](skills/jev-browser/references/snapshot-refs.md) and [session guide](skills/jev-browser/references/sessions-auth.md).
