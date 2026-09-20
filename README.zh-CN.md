@@ -103,7 +103,7 @@ jevb session close demo
 | `--headed` | 启动本地浏览器时显示窗口；连接已有浏览器无需此参数 | `jevb page open demo https://example.com --headed` |
 | `--json` | 以 JSON 输出操作结果，便于脚本读取 | `jevb tab list mychrome --auto-connect --json` |
 
-连接日常使用的 Chrome（144+）时，先在地址栏打开 `chrome://inspect/#remote-debugging` 并启用远程调试，连接时允许 Chrome 的授权请求：
+连接日常使用的 Chrome（144+）时，先在地址栏打开 `chrome://inspect/#remote-debugging` 并启用远程调试。`--auto-connect` 会保持连接并等待你响应 Chrome 的授权弹窗，允许后继续执行；没有授权倒计时，可以按 `Ctrl+C` 取消：
 
 ```bash
 jevb tab list mychrome --auto-connect

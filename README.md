@@ -105,7 +105,7 @@ For refs and session reuse, read the [snapshot guide](skills/jev-browser/referen
 | `--headed` | Show the window when launching a local browser; unnecessary when attaching to an existing browser | `jevb page open demo https://example.com --headed` |
 | `--json` | Output operation results as JSON for scripts | `jevb tab list mychrome --auto-connect --json` |
 
-To connect to your everyday Chrome (144+), open `chrome://inspect/#remote-debugging`, enable remote debugging, and allow Chrome's authorization prompt when connecting:
+To connect to your everyday Chrome (144+), open `chrome://inspect/#remote-debugging` and enable remote debugging. `--auto-connect` keeps the connection open until you answer Chrome's authorization prompt, with no authorization deadline. Allow the connection to continue, or press `Ctrl+C` to cancel:
 
 ```bash
 jevb tab list mychrome --auto-connect

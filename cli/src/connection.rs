@@ -1100,21 +1100,28 @@ fn has_os_error(error: &str, code: u32) -> bool {
 /// The env var is deliberately NOT consulted here. Reading it would apply a
 /// long wait budget to every command, so a genuinely hung daemon on a simple
 /// `url`/`title`/`snapshot` call would take the full budget to surface
-/// instead of 30s. Only commands that actually carry a `timeout` field get
-/// the extended budget, and that field is set client-side per invocation,
+/// instead of 30s. Auto-connect launch waits for the user's authorization without
+/// a deadline. Other extended budgets are set client-side per invocation,
 /// avoiding the daemon's spawn-time env snapshot drifting from the client.
-fn read_timeout_for(cmd: &Value) -> Duration {
+fn read_timeout_for(cmd: &Value) -> Option<Duration> {
+    if cmd.get("action").and_then(Value::as_str) == Some("launch")
+        && cmd.get("autoConnect").and_then(Value::as_bool) == Some(true)
+    {
+        return None;
+    }
     let mut op_ms = cmd.get("timeout").and_then(|v| v.as_u64()).unwrap_or(0);
     if cmd.get("action").and_then(Value::as_str) == Some("mousemove") {
         op_ms = op_ms.max(cmd.get("duration").and_then(Value::as_u64).unwrap_or(0));
     }
-    Duration::from_millis(op_ms.saturating_add(10_000).max(30_000))
+    Some(Duration::from_millis(
+        op_ms.saturating_add(10_000).max(30_000),
+    ))
 }
 
 fn send_command_once(cmd: &Value, session: &str) -> Result<Response, String> {
     let mut stream = connect(session)?;
 
-    stream.set_read_timeout(Some(read_timeout_for(cmd))).ok();
+    stream.set_read_timeout(read_timeout_for(cmd)).ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
     let mut json_str = serde_json::to_string(cmd).map_err(|e| e.to_string())?;
@@ -1201,7 +1208,26 @@ mod tests {
     fn long_mouse_movement_gets_its_requested_time_budget() {
         assert_eq!(
             read_timeout_for(&json!({"action":"mousemove", "duration": 35_000})),
-            Duration::from_secs(45)
+            Some(Duration::from_secs(45))
+        );
+    }
+
+    #[test]
+    fn auto_connect_launch_waits_without_changing_operation_timeouts() {
+        assert_eq!(
+            read_timeout_for(&json!({"action": "launch", "autoConnect": true})),
+            None
+        );
+        for cmd in [
+            json!({"action": "launch"}),
+            json!({"action": "launch", "autoConnect": false}),
+            json!({"action": "snapshot", "autoConnect": true}),
+        ] {
+            assert_eq!(read_timeout_for(&cmd), Some(Duration::from_secs(30)));
+        }
+        assert_eq!(
+            read_timeout_for(&json!({"action": "wait", "timeout": 200_000})),
+            Some(Duration::from_secs(210))
         );
     }
 

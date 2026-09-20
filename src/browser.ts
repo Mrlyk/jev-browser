@@ -66,8 +66,16 @@ export class Browser {
         env: this.env, shell: false, windowsHide: true,
         stdio: [options.input !== undefined ? 'pipe' : 'inherit', 'pipe', 'pipe'],
       });
-      let stdout = '', stderr = '', timedOut = false, oversized = false;
+      let stdout = '', stderr = '', timedOut = false, oversized = false, interrupted = false;
+      const cancel = () => { interrupted = true; child.kill(); };
+      process.once('SIGINT', cancel);
+      process.once('SIGTERM', cancel);
       const timer = options.timeoutMs ? setTimeout(() => { timedOut = true; child.kill(); }, options.timeoutMs) : undefined;
+      const cleanup = () => {
+        clearTimeout(timer);
+        process.removeListener('SIGINT', cancel);
+        process.removeListener('SIGTERM', cancel);
+      };
       child.stdout!.on('data', chunk => {
         if (options.progress) process.stderr.write(chunk);
         if (options.passthrough) process.stdout.write(chunk);
@@ -77,10 +85,10 @@ export class Browser {
         if (options.passthrough || options.progress) process.stderr.write(chunk);
         else if (stderr.length < 16_000) stderr += chunk;
       });
-      child.once('error', () => { clearTimeout(timer); reject(new JevError('CORE_START_FAILED', 'Failed to start the bundled browser executor.')); });
+      child.once('error', () => { cleanup(); reject(new JevError('CORE_START_FAILED', 'Failed to start the bundled browser executor.')); });
       child.once('close', code => {
-        clearTimeout(timer);
-        if (timedOut || oversized || code === null) reject(new JevError('EXECUTION_UNKNOWN', 'Browser executor interrupted. Execution outcome is unknown; the action was not replayed.', true));
+        cleanup();
+        if (timedOut || oversized || interrupted || code === null) reject(new JevError('EXECUTION_UNKNOWN', 'Browser executor interrupted. Execution outcome is unknown; the action was not replayed.', true));
         else resolve({ code, stdout, stderr });
       });
       if (options.input !== undefined) {
@@ -93,7 +101,8 @@ export class Browser {
   async request(command: string[], options: { dispatch?: boolean; privateValue?: string } = {}): Promise<any> {
     const batch = options.dispatch === true;
     const result = await this.run(batch ? ['--json', 'batch', '--bail'] : ['--json', ...command], {
-      input: batch ? JSON.stringify([command]) : undefined, timeoutMs: 60_000,
+      // The core applies operation deadlines after Chrome authorization finishes.
+      input: batch ? JSON.stringify([command]) : undefined,
     });
     let raw: any;
     try { raw = JSON.parse(result.stdout); }

@@ -551,7 +551,25 @@ async fn handle_connection<S>(
 
                 let response = {
                     let mut s = state.lock().await;
-                    let response = execute_command(&cmd, &mut s).await;
+                    let response = if action == "launch"
+                        && cmd.get("autoConnect").and_then(Value::as_bool) == Some(true)
+                    {
+                        match until_client_disconnect(
+                            &mut buf_reader,
+                            execute_command(&cmd, &mut s),
+                        )
+                        .await
+                        {
+                            Some(response) => response,
+                            None => {
+                                let _ = close_current_browser(&mut s).await;
+                                idle_activity.mark();
+                                break;
+                            }
+                        }
+                    } else {
+                        execute_command(&cmd, &mut s).await
+                    };
                     // Refresh while the state lock is still held. An idle
                     // timer waiting on this command will observe the updated
                     // clock as soon as it acquires the lock.
@@ -579,6 +597,22 @@ async fn handle_connection<S>(
             }
             Err(_) => break,
         }
+    }
+}
+
+// Auto-connect may await a human indefinitely. Dropping its future on EOF also
+// drops the pending Chrome connection and releases the session for the next CLI.
+async fn until_client_disconnect<R>(
+    reader: &mut R,
+    operation: impl std::future::Future<Output = Value>,
+) -> Option<Value>
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    let mut sink = tokio::io::sink();
+    tokio::select! {
+        response = operation => Some(response),
+        _ = tokio::io::copy(reader, &mut sink) => None,
     }
 }
 
@@ -740,6 +774,45 @@ mod tests {
         // wait for a new full idle period instead of closing immediately.
         activity.mark();
         assert!(remaining_idle_timeout(&activity, 100).is_some());
+    }
+
+    #[tokio::test]
+    async fn auto_connect_client_disconnect_cancels_pending_connection() {
+        let (client, mut reader) = tokio::io::duplex(64);
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let state = Arc::new(tokio::sync::Mutex::new(()));
+        let held_state = state.clone();
+        let handler = tokio::spawn(async move {
+            until_client_disconnect(&mut reader, async move {
+                let _guard = held_state.lock().await;
+                let _ = started_tx.send(());
+                std::future::pending::<Value>().await
+            })
+            .await
+        });
+        started_rx.await.unwrap();
+        assert!(state.try_lock().is_err());
+        drop(client);
+        let response = tokio::time::timeout(Duration::from_secs(1), handler)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(response.is_none());
+        assert!(
+            state.try_lock().is_ok(),
+            "cancelled authorization must release the session"
+        );
+    }
+
+    #[tokio::test]
+    async fn auto_connect_returns_response_while_client_remains_connected() {
+        let (_client, mut reader) = tokio::io::duplex(64);
+        let response = until_client_disconnect(&mut reader, async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            serde_json::json!({"success": true})
+        })
+        .await;
+        assert_eq!(response, Some(serde_json::json!({"success": true})));
     }
 
     #[test]
