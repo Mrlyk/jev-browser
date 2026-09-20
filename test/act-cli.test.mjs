@@ -25,7 +25,7 @@ function fixture(t) {
       appendFileSync(process.env.MODEL_LOG, JSON.stringify(request) + '\\n');
       const answers = Object.fromEntries(Object.entries(request.questions).map(([id, q]) => {
         if (q.type === 'noul') return [id, { type: 'noul', noul: .99 }];
-        const chosen = id === 'operation' ? 'input' : ['target', 'input_target'].includes(id) ? 'e1' : id === 'value' ? 'v0' : 'none';
+        const chosen = id === 'operation' ? (process.env.OPEN_SITE ? 'open' : 'input') : id === 'url' ? (process.env.OPEN_SITE || 'none') : ['target', 'input_target'].includes(id) ? 'e1' : id === 'value' && q.criteria.v0 !== undefined ? 'v0' : 'none';
         const p = ['target', 'input_target'].includes(id) ? .8 : 1;
         return [id, { type: 'choice', choice: chosen, confidence: p,
           probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === chosen ? p : k === 'none' ? 1-p : 0])) }];
@@ -113,4 +113,36 @@ test('interactive confirmation accepts y; Enter, no and Ctrl-C cancel without di
   assert.equal(yes.status, 0, yes.stdout + yes.stderr);
   assert.match(yes.stdout, /操作已执行/);
   assert.deepEqual(f.actions(), [['fill', '@e1', 'jev'], ['focus', '@e1'], ['press', 'Enter']]);
+});
+
+test('unknown sites return an actionable JSON error and never dispatch', t => {
+  const f = fixture(t);
+  const result = f.run(['打开某个未知网站'], { OPEN_SITE: 'none' });
+  assert.equal(result.result.error.code, 'NEEDS_URL');
+  assert.match(result.result.error.message, /完整网址/);
+  assert.match(result.result.error.message, /jevb page act demo "打开 https:\/\/example.com"/);
+  assert.equal(result.result.error.dispatched, false);
+  assert.deepEqual(f.actions(), []);
+  const preview = f.run(['打开某个未知网站', '--dry-run'], { OPEN_SITE: 'none' });
+  assert.match(preview.result.error.message, /--dry-run --json/);
+});
+
+test('interactive unknown site accepts a URL, cancels, rejects invalid URLs, and respects dry-run', t => {
+  for (const INPUT of ['\n', '\u0003', 'javascript:alert(1)\n', 'example.com\n', 'https://example.com/path\n']) {
+    const f = fixture(t);
+    const result = f.run(['打开某个未知网站'], { OPEN_SITE: 'none', FAKE_TTY: '1', INPUT });
+    assert.match(result.stdout, /请输入完整网址/);
+    if (INPUT.startsWith('https:')) {
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(f.actions(), [['open', 'https://example.com/path']]);
+      assert.equal(f.models().length, 1);
+    } else {
+      assert.deepEqual(f.actions(), []);
+      assert.match(result.stdout + result.stderr, INPUT === '\n' || INPUT === '\u0003' ? /已取消/ : /INVALID_VALUE/);
+    }
+  }
+  const f = fixture(t);
+  const result = f.run(['打开某个未知网站', '--dry-run'], { OPEN_SITE: 'none', FAKE_TTY: '1', INPUT: 'https://example.com\n' });
+  assert.match(result.stdout, /操作预览/);
+  assert.deepEqual(f.actions(), []);
 });

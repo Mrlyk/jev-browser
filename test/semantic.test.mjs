@@ -6,6 +6,7 @@ import { parseArgs } from '../dist/arguments.js';
 import { snapshot, candidatesFor } from '../dist/snapshot.js';
 import { command, quotedValues } from '../dist/actions.js';
 import { JevError } from '../dist/errors.js';
+import { sites } from '../dist/sites.js';
 
 const data = () => ({ origin: 'http://localhost/', pageId: 'p1', frameId: null,
   snapshot: '- document\n  - region "入住信息":\n    - button "确认" [ref=e1]\n    - textbox "姓名" [ref=e2]\n  - region "发票信息":\n    - button "确认" [ref=e3]',
@@ -235,4 +236,49 @@ test('确认编号不可同时修改计划或阈值', () => {
   assert.equal(parseArgs(['page', 'act', 'demo', '--cancel', 'jev-id']).options.cancel, 'jev-id');
   for (const extra of [['搜索别的内容'], ['--value', 'other'], ['--dry-run'], ['--scope', '#other'], ['--min-probability', '0'], ['--cancel', 'id']])
     assert.throws(() => parseArgs(['page', 'act', 'demo', '--confirm', 'jev-id', ...extra]), { code: 'INVALID_ARGUMENT' });
+});
+
+test('常用网站名称映射为可执行网址，显式 open 同样支持', async () => {
+  for (const op of [undefined, 'open']) {
+    const s = setup({ operation: 'open', [op ? 'value' : 'url']: 'google' });
+    const result = await act(options({ op, instruction: '打开“谷歌”' }), s.browser, s.jev);
+    assert.equal(result.data.plan.value, 'https://www.google.com');
+    assert.deepEqual(s.commands.filter(c => c.config?.dispatch).map(c => c.args), [['open', 'https://www.google.com']]);
+    assert.equal(s.requests.length, 1);
+    assert.match(s.requests[0].questions[op ? 'value' : 'url'].criteria.google, /谷歌 Google/);
+  }
+});
+
+test('30 个内置站点都能形成有效导航计划，预览不执行', async () => {
+  assert.equal(Object.keys(sites).length, 30);
+  assert.equal(new Set(Object.values(sites).map(site => site.url)).size, 30);
+  for (const [id, site] of Object.entries(sites)) {
+    const s = setup({ operation: 'open', url: id });
+    const result = await act(options({ op: undefined, instruction: `打开${site.label}`, dryRun: true }), s.browser, s.jev);
+    assert.equal(result.data.status, 'resolved');
+    assert.equal(result.data.plan.value, site.url);
+    assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+  }
+});
+
+test('完整网址优先于常用网站，原始路径与参数保留', async () => {
+  const s = setup({ operation: 'open', url: 'v0' });
+  const url = 'https://www.google.com/maps?q=hello';
+  await act(options({ op: undefined, instruction: `打开Google地图 ${url}` }), s.browser, s.jev);
+  assert.equal(s.requests[0].questions.url.criteria.google, undefined);
+  assert.deepEqual(s.commands.at(-1).args, ['open', url]);
+});
+
+test('未知或歧义网站请求完整网址，低置信度匹配仍需确认', async () => {
+  for (const choice of ['none', 'ambiguous']) {
+    const s = setup({ operation: 'open', url: choice });
+    await assert.rejects(act(options({ op: undefined, instruction: '打开未知网站' }), s.browser, s.jev), { code: 'NEEDS_URL' });
+    assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+  }
+  const s = setup({ operation: 'open', url: { choice: 'google', probabilities: { google: 0.6, none: 0.4 } } });
+  const plan = await prepareAct(options({ op: undefined, instruction: '打开Google' }), s.browser, s.jev);
+  assert.equal((await executePlan(plan, s.browser)).data.status, 'needs_confirmation');
+  assert.equal(s.commands.filter(c => c.config?.dispatch).length, 0);
+  await executePlan(plan, s.browser, true);
+  assert.deepEqual(s.commands.at(-1).args, ['open', 'https://www.google.com']);
 });

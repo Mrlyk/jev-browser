@@ -1,12 +1,27 @@
 import { createInterface } from 'node:readline/promises';
 import { Browser } from './browser.js';
-import { type ActOptions } from './actions.js';
+import { command, type ActOptions } from './actions.js';
 import { Jev, modelConfig } from './jev.js';
 import { readCredentials } from './credentials.js';
 import { prepareAct, executePlan, planResult } from './semantic.js';
 import { savePending, takePending } from './confirmation.js';
+import { JevError } from './errors.js';
 
 type Result = ReturnType<typeof planResult> & { confirmation?: { id: string; expiresAt: number; confirmCommand: string; cancelCommand: string } };
+
+async function askUrl(): Promise<string | undefined> {
+  const input = createInterface({ input: process.stdin, output: process.stdout });
+  const cancel = new AbortController();
+  input.once('SIGINT', () => cancel.abort());
+  input.once('close', () => cancel.abort());
+  try {
+    const value = (await input.question('请输入完整网址（如 https://example.com，直接回车取消）：', { signal: cancel.signal })
+      .catch(error => { if (cancel.signal.aborted) return ''; throw error; })).trim();
+    if (!value) return;
+    command('open', { value });
+    return value;
+  } finally { input.close(); }
+}
 
 export function formatAct(result: Result): string {
   const { status, plan, uncertainties } = result.data;
@@ -36,7 +51,17 @@ export async function runAct(options: ActOptions, browser: Browser, context: { s
     return;
   }
   const jev = new Jev(modelConfig(process.env, readCredentials()));
-  const plan = await prepareAct(options, browser, jev);
+  let plan;
+  try { plan = await prepareAct(options, browser, jev); }
+  catch (error) {
+    if (!(error instanceof JevError) || error.code !== 'NEEDS_URL') throw error;
+    if (context.json || !process.stdin.isTTY || !process.stdout.isTTY)
+      throw new JevError(error.code, `${error.message}\n请将示例网址替换为目标地址后重试：jevb page act ${context.session} "打开 https://example.com"${options.dryRun ? ' --dry-run' : ''}${context.json ? ' --json' : ''}`);
+    process.stdout.write(error.message + '\n');
+    const value = await askUrl();
+    if (!value) { process.stdout.write('已取消，尚未执行。\n'); return; }
+    plan = await prepareAct({ ...options, op: 'open', value }, browser, jev);
+  }
   const result: Result = await executePlan(plan, browser);
   result.meta.timings.cliStartupMs = startupMs;
   if (result.data.status !== 'needs_confirmation' || options.dryRun) { print(result); return; }

@@ -4,6 +4,7 @@ import { snapshot, candidatesFor, assertFresh, type Candidate, type Snapshot } f
 import { buildQuestions, describe, inputValues } from './questions.js';
 import { Browser } from './browser.js';
 import { JevError } from './errors.js';
+import { sites } from './sites.js';
 
 export type Uncertainty = { subject: string; message: string; probability: number; margin: number;
   alternatives: Array<{ label: string; probability: number }> };
@@ -30,7 +31,7 @@ function uncertainty(answer: Answer, context: { subject: string; labels: Record<
 
 export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev): Promise<Plan> {
   const start = performance.now();
-  if (options.op && needsValue.has(options.op) && options.value === undefined &&
+  if (options.op && options.op !== 'open' && needsValue.has(options.op) && options.value === undefined &&
     !Object.keys(['fill', 'type'].includes(options.op) ? inputValues(options.instruction) : valueOptions(options.op, options.instruction)).length)
     throw new JevError('NEEDS_INPUT', '没有识别出要输入的内容，请用引号标明文字，或使用 --value / --value-stdin。');
   const before = await observe(browser, options.scope);
@@ -72,8 +73,11 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
   let value = options.value;
   if (needsValue.has(op) && value === undefined) {
     const id = !options.op && op === 'open' ? 'url' : !options.op && op === 'press' ? 'key' : !options.op && op === 'scroll' ? 'direction' : 'value';
-    const selected = pick(id, '要输入或使用的内容');
-    value = op === 'press' || op === 'scroll' ? selected : built.questions[id].criteria[selected];
+    if (op === 'open' && ['none', 'ambiguous'].includes(asChoice(answers[id]).choice))
+      throw new JevError('NEEDS_URL', '暂时无法确定要打开的网站，尚未执行。请提供以 https:// 或 http:// 开头的完整网址。');
+    const selected = pick(id, op === 'open' ? '要打开的网站或网址' : '要输入或使用的内容');
+    value = op === 'press' || op === 'scroll' ? selected : op === 'open' && Object.hasOwn(sites, selected)
+      ? sites[selected].url : built.questions[id].criteria[selected];
   }
   command(op, { ref: target?.ref, value });
   return { operation: op, target, value, hiddenValue: options.value !== undefined, submit, before,

@@ -4,7 +4,7 @@ export const operations = {
   click: '单击目标', dblclick: '双击目标', fill: '清空并填写输入框', type: '向输入框追加内容',
   check: '设置复选框为选中', uncheck: '取消勾选复选框', hover: '悬停目标', focus: '聚焦目标',
   select: '选择原生下拉框的明确值或标签', scrollintoview: '将目标滚入视口', get_text: '读取目标原文',
-  open: '打开明确 URL', back: '后退一页', forward: '前进一页', reload: '刷新当前页面',
+  open: '打开网站或网址', back: '后退一页', forward: '前进一页', reload: '刷新当前页面',
   scroll: '按指定方向滚动页面', press: '按一个明确按键或组合键',
 } as const;
 export type Operation = keyof typeof operations;
@@ -32,7 +32,7 @@ export function valueOptions(op: Operation, instruction: string): Record<string,
   if (op === 'press') return keys;
   if (op === 'scroll') return directions;
   let values = quotedValues(instruction);
-  if (op === 'open') values = [...new Set([...values, ...(instruction.match(/https?:\/\/[^\s"'“”「」<>]+/g) ?? [])])];
+  if (op === 'open') values = [...new Set([...values.filter(v => /^[a-z][a-z\d+.-]*:/i.test(v)), ...(instruction.match(/https?:\/\/[^\s"'“”「」<>]+/gi) ?? [])])];
   return Object.fromEntries(values.map((v, i) => [`v${i}`, v]));
 }
 

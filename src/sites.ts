@@ -1,0 +1,36 @@
+// Common homepages and aliases; Jev selects the site, code supplies its URL.
+export const sites: Record<string, { url: string; label: string }> = {
+  google: { url: 'https://www.google.com', label: '谷歌 Google' },
+  baidu: { url: 'https://www.baidu.com', label: '百度 Baidu' },
+  github: { url: 'https://github.com', label: 'GitHub' },
+  bilibili: { url: 'https://www.bilibili.com', label: 'B站 哔哩哔哩 bilibili' },
+  zhihu: { url: 'https://www.zhihu.com', label: '知乎' },
+  taobao: { url: 'https://www.taobao.com', label: '淘宝' },
+  jd: { url: 'https://www.jd.com', label: '京东' },
+  youtube: { url: 'https://www.youtube.com', label: 'YouTube 油管' },
+  twitter: { url: 'https://x.com', label: 'X / Twitter 推特' },
+  bing: { url: 'https://www.bing.com', label: '必应 Bing' },
+  duckduckgo: { url: 'https://duckduckgo.com', label: 'DuckDuckGo' },
+  yahoo: { url: 'https://www.yahoo.com', label: '雅虎 Yahoo' },
+  wikipedia: { url: 'https://www.wikipedia.org', label: '维基百科 Wikipedia' },
+  stackoverflow: { url: 'https://stackoverflow.com', label: 'Stack Overflow StackOverflow' },
+  csdn: { url: 'https://www.csdn.net', label: 'CSDN' },
+  juejin: { url: 'https://juejin.cn', label: '掘金 稀土掘金' },
+  gitlab: { url: 'https://gitlab.com', label: 'GitLab' },
+  npm: { url: 'https://www.npmjs.com', label: 'npm npmjs' },
+  amazon: { url: 'https://www.amazon.com', label: '亚马逊 Amazon' },
+  tmall: { url: 'https://www.tmall.com', label: '天猫 Tmall' },
+  douban: { url: 'https://www.douban.com', label: '豆瓣 Douban' },
+  weibo: { url: 'https://weibo.com', label: '微博 新浪微博 Weibo' },
+  xiaohongshu: { url: 'https://www.xiaohongshu.com', label: '小红书 Xiaohongshu RedNote' },
+  douyin: { url: 'https://www.douyin.com', label: '抖音 Douyin' },
+  reddit: { url: 'https://www.reddit.com', label: 'Reddit 红迪' },
+  facebook: { url: 'https://www.facebook.com', label: 'Facebook 脸书' },
+  instagram: { url: 'https://www.instagram.com', label: 'Instagram ins' },
+  linkedin: { url: 'https://www.linkedin.com', label: 'LinkedIn 领英' },
+  netflix: { url: 'https://www.netflix.com', label: 'Netflix 奈飞 网飞' },
+  spotify: { url: 'https://open.spotify.com', label: 'Spotify 声田' },
+};
+
+export const siteChoices = Object.fromEntries(Object.entries(sites).map(([id, site]) =>
+  [id, `${site.label}（${site.url}）`]));
