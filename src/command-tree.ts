@@ -11,7 +11,7 @@ function direct(names: string): Record<string, string[]> {
 export const commandGroups: Record<string, Group> = {
   session: { description: '会话管理', actions: {
     list: ['session', 'list'], ls: ['session', 'list'], inspect: ['session', 'info'],
-    info: ['session', 'info'], current: ['session'], id: ['session', 'id'], close: ['close'],
+    info: ['session', 'info'], current: ['session'], id: ['session', 'id'], close: ['close'], clear: ['close', '--all'],
   } },
   browser: { description: '浏览器连接、安装与配置', actions: {
     ...direct('connect inspect install doctor upgrade'), configure: ['set'],
@@ -66,6 +66,7 @@ export function requiresSession(args: string[]): boolean {
 }
 
 const usages: Record<string, string> = {
+  'session clear': '[--json]（关闭全部运行中的会话，无需会话名）',
   'session list': '[--json]', 'session ls': '[--json]', 'session current': '[--json]',
   'session inspect': '[--json]', 'session info': '[--json]',
   'session id': '[--scope worktree|cwd|git-root] [--prefix <前缀>]',

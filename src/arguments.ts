@@ -40,7 +40,7 @@ function validateManagement(args: string[], action: string): void {
     if (args[i] === '--all' && action === 'close') continue;
     const n = globalLength(args, i, false);
     if (n) { i += n - 1; continue; }
-    throw new JevError('INVALID_ARGUMENT', `session ${action} 不接受额外参数。用法：jev-browser session ${action} <会话名>。`);
+    throw new JevError('INVALID_ARGUMENT', `session ${action} 不接受额外参数。用法：jev-browser session ${action}${action === 'clear' ? ' [--json]' : ' <会话名>'}。`);
   }
 }
 
@@ -81,6 +81,7 @@ export function parseArgs(args: string[]) {
   const normalized = normalizeCommand(selected.args);
   const [name, ...rest] = normalized.args;
   const showingHelp = !!normalized.help || rest.some(arg => ['--help', '-h'].includes(arg));
+  if (!showingHelp && normalized.path === 'session clear') validateManagement(selected.args.slice(2), 'clear');
   if (!showingHelp && name === 'close') {
     validateManagement(rest, 'close');
     if (selected.session && rest.includes('--all'))

@@ -84,6 +84,7 @@ jevb session close demo
 | `session list` | 查看运行中的会话 | `jevb session list` |
 | `session inspect` | 查看会话详情 | `jevb session inspect demo` |
 | `session close` | 关闭指定会话 | `jevb session close demo` |
+| `session clear` | 一次关闭全部运行中的会话 | `jevb session clear` |
 | `browser connect` | 连接已开启调试端口的浏览器 | `jevb browser connect demo 9222` |
 | `state save` | 保存登录状态 | `jevb state save demo auth.json` |
 

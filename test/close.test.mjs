@@ -75,6 +75,50 @@ test('close help is available without login and explains session selection', t =
   assert.equal(run(['help', 'session', 'close']).stdout, subcommand.stdout);
 });
 
+test('session clear routes to close all and rejects operands before login', t => {
+  const { root, run } = fixture(t);
+  for (const args of [['session', 'clear'], ['session', 'clear', '--json'], ['--json', 'session', 'clear']]) {
+    const parsed = parseArgs(args);
+    assert.equal(parsed.name, 'close');
+    assert.equal(parsed.sessionRequired, false);
+    assert.deepEqual(parsed.rest, args.at(-1) === '--json' ? ['--all', '--json'] : ['--all']);
+    assert.equal(parsed.json, args.includes('--json'));
+  }
+  for (const tail of [['demo'], ['--all'], ['--unknown']]) {
+    const result = run(['session', 'clear', ...tail]);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /INVALID_ARGUMENT.*jev-browser session clear/);
+    assert(!existsSync(join(root, 'run')));
+  }
+  for (const args of [['session', 'clear', '--help'], ['help', 'session', 'clear']]) {
+    const result = run(args);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /jev-browser session clear/);
+    assert.match(result.stdout, /关闭全部/);
+  }
+});
+
+nativeTest('session clear closes every daemon and succeeds again on an empty runtime', t => {
+  const { run } = fixture(t);
+  const env = { TYPESAFE_API_KEY: 'local-test-placeholder' };
+  for (const session of ['first', 'second']) {
+    const started = run(['stream', 'status', session, '--json'], env);
+    assert.equal(started.status, 0, started.stderr);
+  }
+  const cleared = run(['session', 'clear', '--json'], env);
+  assert.equal(cleared.status, 0, cleared.stderr);
+  const response = JSON.parse(cleared.stdout);
+  assert.equal(response.success, true);
+  assert.equal(response.data.closed, 2);
+  assert.deepEqual(response.data.sessions.sort(), ['first', 'second']);
+  const remaining = run(['session', 'list', '--json'], env);
+  assert.equal(remaining.status, 0, remaining.stderr);
+  assert.deepEqual(JSON.parse(remaining.stdout).data.sessions, []);
+  const empty = run(['session', 'clear', '--json'], env);
+  assert.equal(empty.status, 0, empty.stderr);
+  assert.deepEqual(JSON.parse(empty.stdout), { success: true, data: { closed: 0, sessions: [] } });
+});
+
 nativeTest('real executor names the closed session in text and JSON without launching a browser', t => {
   const { run } = fixture(t);
   // An isolated runtime and close-only commands exercise the daemon lifecycle;

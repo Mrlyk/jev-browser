@@ -86,6 +86,7 @@ Replace selectors and tab IDs with values from your page. Use `jevb <resource> <
 | `session list` | List running sessions | `jevb session list` |
 | `session inspect` | Inspect a session | `jevb session inspect demo` |
 | `session close` | Close a session | `jevb session close demo` |
+| `session clear` | Close all running sessions | `jevb session clear` |
 | `browser connect` | Connect to a browser's open debug port | `jevb browser connect demo 9222` |
 | `state save` | Save login state | `jevb state save demo auth.json` |
 
