@@ -6,13 +6,25 @@ English | [简体中文](README.zh-CN.md)
 
 ## 1. Install
 
-Requires Node.js 22+. The prebuilt package supports macOS Apple Silicon. Other platforms need a [source build](#5-local-development).
+Requires Node.js 22+. The prebuilt package supports macOS Apple Silicon. Other platforms need a [source build](#4-local-development).
 
 ```bash
 npm install -g jev-browser-cli
 ```
 
 Use `jevb` or the equivalent `jev-browser`. When you first open a page, the CLI finds Chrome or downloads it if needed.
+
+### Copy to your agent
+
+Paste this prompt into your coding agent to install both the CLI and its companion skill:
+
+```text
+Install the jev-browser CLI with `npm install -g jev-browser-cli`.
+Then run `npx skills add Mrlyk/jev-browser --skill jev-browser` and select
+your agent. Read the skill at
+https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
+and use it for browser tasks in this project.
+```
 
 ## 2. Configure a model
 
@@ -113,17 +125,7 @@ printf '%s' "$TEST_PASSWORD" | jevb page act demo --op fill 'Password field' --v
 
 `--op fill` replaces contents; `--op type` appends. Neither presses Enter automatically. Values passed through `--value` or stdin are neither sent to the model nor echoed.
 
-## 4. Use with an agent
-
-Install the companion skill so your agent can call the CLI through a terminal:
-
-```bash
-npx skills add Mrlyk/jev-browser --skill jev-browser
-```
-
-Select your agent when prompted and have it read [SKILL.md](skills/jev-browser/SKILL.md). The agent plans steps and checks results; Jev makes semantic judgments within each operation.
-
-## 5. Local development
+## 4. Local development
 
 Requires Node.js 22+ and stable Rust. From the repository root:
 
@@ -152,7 +154,7 @@ npm run publish              # Publish with npm permissions
 
 See [validation results](VALIDATION.md) for measured model latency, costs, and test coverage.
 
-## 6. License
+## 5. License
 
 [Apache-2.0](LICENSE). Browser execution uses [agent-browser](https://github.com/vercel-labs/agent-browser).
 

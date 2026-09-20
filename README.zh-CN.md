@@ -6,13 +6,25 @@
 
 ## 1. 安装
 
-需要 Node.js 22+。预编译包支持 macOS Apple Silicon；其他平台需按[本地开发](#5-本地开发)从源码构建。
+需要 Node.js 22+。预编译包支持 macOS Apple Silicon；其他平台需按[本地开发](#4-本地开发)从源码构建。
 
 ```bash
 npm install -g jev-browser-cli
 ```
 
 安装后使用 `jevb`，也可使用等价的 `jev-browser`。首次打开页面时会查找 Chrome，缺少时自动下载。
+
+### 复制给 Agent
+
+将下面的提示词粘贴给编程 Agent，让它安装 CLI 和配套 Skill：
+
+```text
+执行 `npm install -g jev-browser-cli` 安装 jev-browser CLI，
+再执行 `npx skills add Mrlyk/jev-browser --skill jev-browser` 安装配套 Skill，
+并选择你当前使用的 Agent。读取 Skill：
+https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
+之后在本项目的浏览器任务中使用这个 Skill。
+```
 
 ## 2. 配置模型
 
@@ -105,17 +117,7 @@ printf '%s' "$TEST_PASSWORD" | jevb page act demo --op fill '密码输入框' --
 
 `--op fill` 清空后填写，`--op type` 追加，两者都不会自动回车。通过 `--value` 或标准输入提供的内容不发送给模型，也不回显。
 
-## 4. 交给 Agent 使用
-
-安装配套 Skill，让 Agent 通过终端调用 CLI：
-
-```bash
-npx skills add Mrlyk/jev-browser --skill jev-browser
-```
-
-按提示选择 Agent，并让它读取 [SKILL.md](skills/jev-browser/SKILL.md)。Agent 负责安排步骤和检查结果，Jev 负责每次操作中的语义判断。
-
-## 5. 本地开发
+## 4. 本地开发
 
 需要 Node.js 22+ 和 Rust stable。在仓库根目录运行：
 
@@ -144,6 +146,6 @@ npm run publish              # 发布到 npm，需要发布权限
 
 模型调用耗时、费用和测试覆盖见[验证记录](VALIDATION.md)。
 
-## 6. 开源协议
+## 5. 开源协议
 
 采用 [Apache-2.0](LICENSE)。浏览器执行能力基于 [agent-browser](https://github.com/vercel-labs/agent-browser)，源码版本与授权见 [UPSTREAM.json](UPSTREAM.json)、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
