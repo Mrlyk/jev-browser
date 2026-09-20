@@ -91,6 +91,7 @@ export function parseArgs(args: string[]) {
       const arg = rest[i];
       if (arg === '--') { words.push(...rest.slice(i + 1)); break; }
       if (arg === '--dry-run') { options.dryRun = true; continue; }
+      if (arg === '--non-interactive') { options.nonInteractive = true; continue; }
       if (arg === '--value-stdin') { options.valueStdin = true; continue; }
       if (['--op', '--value', '--scope', '--min-probability', '--min-margin', '--confirm', '--cancel'].includes(arg)) {
         const value = rest[++i];

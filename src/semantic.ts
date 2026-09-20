@@ -3,7 +3,7 @@ import { asChoice, Jev, type Answer } from './jev.js';
 import { snapshot, candidatesFor, assertFresh, pageContext, type PageContext, type Candidate, type Snapshot } from './snapshot.js';
 import { buildQuestions, describe, inputValues } from './questions.js';
 import { Browser } from './browser.js';
-import { JevError } from './errors.js';
+import { JevError, withDecisionMeta } from './errors.js';
 import { sites } from './sites.js';
 
 export type Uncertainty = { subject: string; message: string; probability: number; margin: number;
@@ -43,6 +43,11 @@ function uncertainty(answer: Answer, context: { subject: string; labels: Record<
 }
 
 export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev): Promise<Plan> {
+  try { return await prepare(options, browser, jev); }
+  catch (error) { throw withDecisionMeta(error, { modelRequests: jev.evidence.length, decisions: jev.evidence }); }
+}
+
+async function prepare(options: ActOptions, browser: Browser, jev: Jev): Promise<Plan> {
   const start = performance.now();
   if (options.op && options.op !== 'open' && needsValue.has(options.op) && options.value === undefined &&
     !Object.keys(['fill', 'type'].includes(options.op) ? inputValues(options.instruction) : valueOptions(options.op, options.instruction)).length)
@@ -137,6 +142,11 @@ export function planResult(plan: Plan, status: 'needs_confirmation' | 'resolved'
 }
 
 export async function executePlan(plan: Plan, browser: Browser, confirmed = false) {
+  try { return await execute(plan, browser, confirmed); }
+  catch (error) { throw withDecisionMeta(error, plan.meta); }
+}
+
+async function execute(plan: Plan, browser: Browser, confirmed: boolean) {
   const start = performance.now();
   await validatePlan(plan, browser);
   plan.meta.timings.validationMs = Math.round(performance.now() - start);

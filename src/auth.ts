@@ -11,8 +11,9 @@ const help = `账号：
   jev-browser auth login <会话名> <网站账号名>      在指定会话登录已保存的网站账号
 `;
 
-export async function ensureLogin(): Promise<void> {
+export async function ensureLogin(nonInteractive = false): Promise<void> {
   if (credentialStatus().selected) return;
+  if (nonInteractive) throw new JevError('MISSING_API_KEY', 'Run jevb auth login before using --non-interactive.');
   process.stderr.write('请先登录。\n');
   const key = await readToken(false);
   await login(key.startsWith('sk') ? 'openrouter' : 'typesafe', key);

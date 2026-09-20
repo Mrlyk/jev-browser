@@ -49,6 +49,7 @@ export function formatAct(result: Result): string {
 
 export async function runAct(options: ActOptions, browser: Browser, context: { session: string; json: boolean }) {
   const startupMs = Math.round(performance.now());
+  const interactive = !options.nonInteractive && !context.json && process.stdin.isTTY && process.stdout.isTTY;
   const print = (result: Result) => {
     result.data.session = context.session;
     process.stdout.write(context.json ? JSON.stringify(result) + '\n' : formatAct(result));
@@ -63,8 +64,10 @@ export async function runAct(options: ActOptions, browser: Browser, context: { s
   try { plan = await prepareAct(options, browser, jev); }
   catch (error) {
     if (!(error instanceof JevError) || error.code !== 'NEEDS_URL') throw error;
-    if (context.json || !process.stdin.isTTY || !process.stdout.isTTY)
-      throw new JevError(error.code, `${error.message}\nReplace the example URL with your destination and retry: jevb page act ${context.session} "Open https://example.com"${options.dryRun ? ' --dry-run' : ''}${context.json ? ' --json' : ''}`);
+    if (!interactive) {
+      error.message += `\nReplace the example URL with your destination and retry: jevb page act ${context.session} "Open https://example.com"${options.dryRun ? ' --dry-run' : ''}${options.nonInteractive ? ' --non-interactive' : ''}${context.json ? ' --json' : ''}`;
+      throw error;
+    }
     process.stdout.write(error.message + '\n');
     const value = await askUrl();
     if (!value) { process.stdout.write('已取消，尚未执行。\n'); return; }
@@ -72,13 +75,18 @@ export async function runAct(options: ActOptions, browser: Browser, context: { s
   }
   const result: Result = await executePlan(plan, browser);
   result.meta.timings.cliStartupMs = startupMs;
-  if (result.data.status !== 'needs_confirmation' || options.dryRun) { print(result); return; }
+  if (result.data.status !== 'needs_confirmation') { print(result); return; }
+  if (options.dryRun || options.nonInteractive) {
+    print(result);
+    process.exitCode = 2;
+    return;
+  }
   const pending = await savePending(plan, context.session);
   result.confirmation = { ...pending,
     confirmCommand: `jev-browser page act ${context.session} --confirm ${pending.id}`,
     cancelCommand: `jev-browser page act ${context.session} --cancel ${pending.id}` };
   print(result);
-  if (context.json || !process.stdin.isTTY || !process.stdout.isTTY) return;
+  if (!interactive) { process.exitCode = 2; return; }
   const input = createInterface({ input: process.stdin, output: process.stdout });
   const cancel = new AbortController();
   input.once('SIGINT', () => cancel.abort());

@@ -5,19 +5,28 @@ import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Browser } from '../dist/browser.js';
 import { Jev, modelConfig, choice } from '../dist/jev.js';
+import { readCredentials } from '../dist/credentials.js';
 import { act } from '../dist/semantic.js';
 import { withSession } from '../dist/session.js';
 
-const config = modelConfig({ OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY, OPENROUTER_MODEL: process.env.OPENROUTER_MODEL });
+const config = modelConfig(process.env, readCredentials());
 const cdp = process.env.JEV_TEST_CDP;
 if (!cdp) throw Error('JEV_TEST_CDP 需要指向独立测试浏览器。');
 const html = await readFile(new URL('./fixtures/page.html', import.meta.url));
-const server = createServer((_req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(html); });
+const linkHtml = await readFile(new URL('./fixtures/link.html', import.meta.url));
+const server = createServer((req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(req.url === '/link' ? linkHtml : req.url === '/learn-more' ? '<h1 id="destination">Link destination reached</h1>' : html);
+});
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const session = `live-${process.pid}`;
 const browser = new Browser(['--session', session, '--cdp', cdp]);
 const report = { startedAt: new Date().toISOString(), transport: config.transport, requestedModel: config.model, probe: null, cases: [] };
 const cases = [
+  ...[undefined, 'click'].flatMap(op => ['Click Learn more link', '点击 Learn more 链接'].map(instruction => ({
+    name: `小页面链接 ${op ? '--op click' : '自动动作'} ${instruction}`, path: '/link', options: { op, instruction },
+    assertion: async () => assert.equal((await browser.request(['get', 'text', '#destination'])).text, 'Link destination reached'),
+  }))),
   { name: 'dry-run', options: { op: 'click', instruction: '入住信息区域的确认按钮', dryRun: true },
     assertion: async result => { assert.equal(result.data.status, 'resolved'); assert.equal((await browser.request(['get', 'text', '#result'])).text, '等待操作'); } },
   { name: '中文同名按钮', options: { instruction: '点击入住信息区域里的确认按钮' },
@@ -49,11 +58,12 @@ try {
       const start = performance.now();
       const jev = new Jev(config);
       const record = { name: item.name, passed: false };
-      await browser.request(['open', `http://127.0.0.1:${server.address().port}`]);
+      await browser.request(['open', `http://127.0.0.1:${server.address().port}${item.path ?? '/'}`]);
       try {
         const result = await act({ probability: 0.85, margin: 0.2, ...item.options }, browser, jev);
         record.result = result;
         assert.equal(item.error, undefined, `应拒绝执行：${item.error}`);
+        assert.equal(result.data.status, item.options.dryRun ? 'resolved' : 'executed');
         await item.assertion(result);
         record.passed = true;
       } catch (error) {
@@ -73,24 +83,33 @@ try {
   });
   await browser.request(['open', `http://127.0.0.1:${server.address().port}`]);
   const cliStart = performance.now();
+  const cliRecord = { name: '真实 CLI 与 stdin', passed: false };
+  report.cases.push(cliRecord);
   const cliResult = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [fileURLToPath(new URL('../dist/cli.js', import.meta.url)),
-      '--cdp', cdp, '--json', 'page', 'act', session, '--op', 'fill', '姓名输入框', '--value-stdin'], {
-      env: { ...process.env, TYPESAFE_API_KEY: '', OPENROUTER_API_KEY: config.key }, stdio: ['pipe', 'pipe', 'pipe'],
+      '--cdp', cdp, '--json', 'page', 'act', session, '--non-interactive', '--op', 'fill', '姓名输入框', '--value-stdin'], {
+      env: process.env, stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '';
     child.stdout.on('data', chunk => { stdout += chunk; });
     child.stderr.on('data', chunk => { stderr += chunk; });
     child.once('error', reject);
     child.once('close', code => {
-      try { assert.equal(code, 0, stdout + stderr); resolve(JSON.parse(stdout)); } catch (error) { reject(error); }
+      cliRecord.exitCode = code;
+      cliRecord.durationMs = Math.round(performance.now() - cliStart);
+      try {
+        cliRecord.result = JSON.parse(stdout);
+        cliRecord.decisions = cliRecord.result.meta?.decisions ?? [];
+        assert.equal(code, 0, stdout + stderr);
+        resolve(cliRecord.result);
+      } catch (error) { reject(error); }
     });
     child.stdin.end('CLI 真实验证');
   });
   assert.equal(cliResult.success, true);
+  assert.equal(cliResult.data.status, 'executed');
   assert.equal((await browser.request(['get', 'value', '#name'])).value, 'CLI 真实验证');
-  report.cases.push({ name: '真实 CLI 与 stdin', passed: true, result: cliResult,
-    decisions: cliResult.meta.decisions, durationMs: Math.round(performance.now() - cliStart) });
+  cliRecord.passed = true;
   console.log('PASS 真实 CLI 与 stdin');
 } catch (error) {
   report.fatal = { code: error.code, message: error.message };

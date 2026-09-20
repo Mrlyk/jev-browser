@@ -54,10 +54,10 @@ export function buildQuestions(options: ActOptions, before: Snapshot) {
   const values = input ? inputValues(instruction) : op ? valueOptions(op, instruction) : {};
   if (!op) questions.operation = choice(`判断用户希望执行哪一种浏览器操作。输入文字和在同一输入框回车提交可一次完成；其他独立多步任务选 multi_step。用户禁止执行选 unsupported。${boundaries}`, intents);
   if (candidates.length && (!op || !targetless.has(op))) questions.target = choice(
-    `如果用户要求点击、勾选、读取或其他针对页面元素的操作，选择符合指令的目标。${op ? `动作已指定为 ${op}。` : '输入文字的目标由另一个问题判断。'}读取区域时选择容器本身，只有指令指定某段文字才选 StaticText；祖先上下文只说明归属。${boundaries}`,
+    `如果用户要求点击、勾选、读取或其他针对页面元素的操作，选择符合指令的目标。本问题的候选列表给出全部可选目标；page.buttons 仅辅助判断输入框用途，未列在其中的候选仍可选择。${op ? `动作已指定为 ${op}。` : '输入文字的目标由另一个问题判断。'}读取区域时选择容器本身，只有指令指定某段文字才选 StaticText；祖先上下文只说明归属。${boundaries}`,
     { ...Object.fromEntries(candidates.map(c => [c.ref, describe(c)])), ...escapes });
   if (input) {
-    const targetQuestion = choice(`如果用户要输入文字或搜索，应使用哪个输入框？搜索词是要输入的内容，无需与输入框名称匹配。占位提示可能是热门推荐词；结合 page.url 和 page.controls 的搜索按钮等信息判断输入框用途。${boundaries}`,
+    const targetQuestion = choice(`如果用户要输入文字或搜索，应使用哪个输入框？本问题的候选列表给出全部可选输入框。搜索词是要输入的内容，无需与输入框名称匹配。占位提示可能是热门推荐词；结合 page.url 和 page.buttons 中的搜索按钮判断输入框用途，page.buttons 仅包含辅助按钮信息。${boundaries}`,
       { ...Object.fromEntries(inputs.map(c => [c.ref, describe(c)])), ...escapes });
     // Explicit fill/type retain their atomic semantics and existing target field.
     questions[op ? 'target' : 'input_target'] = targetQuestion;
@@ -81,7 +81,8 @@ export function buildQuestions(options: ActOptions, before: Snapshot) {
         { ...(Object.keys(urls).length ? urls : siteChoices), ...escapes });
     }
   }
+  const buttons = input ? before.candidates.filter(c => c.role.toLowerCase() === 'button')
+    .map(c => ({ name: c.name, context: c.context })) : [];
   return { questions, candidates, inputs, values, state: { instruction, operation: op,
-    page: { url: before.origin, controls: before.candidates.filter(c =>
-      ['button', 'searchbox', 'textbox', 'combobox', 'heading'].includes(c.role.toLowerCase())).map(c => ({ role: c.role, name: c.name, context: c.context })) } } };
+    page: { url: before.origin, ...(buttons.length ? { buttons } : {}) } } };
 }

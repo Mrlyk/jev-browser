@@ -34,7 +34,21 @@ Without `--op`, action, input target, source value, clearing, and submission jud
 
 When `data.status` is `needs_confirmation`, inspect `data.plan` and `data.uncertainties` and obtain the user's decision before using the returned `confirmation.confirmCommand` or `confirmation.cancelCommand`. Do not automatically confirm or lower thresholds. The ID expires after five minutes, is bound to the original session, and is consumed once. Confirmation reuses the displayed plan without a new model call and revalidates the page and target. `--dry-run` does not create a confirmation ID.
 
+For CI, use `--non-interactive`: it disables login, URL and confirmation prompts and does not create pending plans. A confident plan still executes; an uncertain plan returns `needs_confirmation` with exit code 2 and no confirmation ID. Log in beforehand. Without this flag, JSON and non-TTY callers retain confirmation IDs for user-approved follow-up commands.
+
+`page act` exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Executed, resolved dry-run, or cancelled. Verify `data.status` and the expected business state. |
+| 1 | Error before dispatch. Read `error.code`. |
+| 2 | Needs confirmation; nothing executed. Includes uncertain dry-runs. Parse the result even though the exit code is nonzero. |
+| 3 | `EXECUTION_UNKNOWN` or an error with `dispatched: true`. Inspect the page before any retry. |
+
+JSON results preserve available model evidence in `meta.decisions`, including `NO_MATCH`, `AMBIGUOUS`, validation and execution errors. Each decision includes `answers` with model probabilities. Failures before a model answer may have empty or absent evidence. `success: true` alone does not mean an action executed.
+
 ```bash
+jev-browser page act ci-demo --json --non-interactive --op click 'Learn more link'
 jev-browser page act task-demo --json '搜索 jev'
 jev-browser page act task-demo --json --confirm <confirmation-id>
 jev-browser page act task-demo --json --cancel <confirmation-id>

@@ -32,7 +32,9 @@ jev-browser session close task-demo --json
 - Use controls and refs actually observed on the page. For repeated labels, include the containing section or a verified CSS `--scope`. Read [snapshot-refs.md](references/snapshot-refs.md) when refs, page changes, or candidate limits matter.
 - Supply input values from the user or test data. Pass secrets with `--value-stdin`, outside the instruction. With a subprocess API use argument arrays and `shell: false`; quote arguments when using a terminal tool.
 - `data.status: resolved` is a dry-run; `executed` means an operation completed. Neither proves the business task succeeded. `needs_confirmation` means nothing has executed: show the plan and uncertainty to the user, then use the returned confirm/cancel command according to their decision. Never automatically confirm. For E2E, use independently defined selectors or business assertions rather than the model-selected ref as the sole check.
-- On failure, read `error.code` and `error.dispatched`; atomic-command schemas may differ. Never automatically replay a write after `EXECUTION_UNKNOWN` or an error with `dispatched: true`. Inspect business state first. Do not lower model thresholds to force an action.
+- For `page act`, exit 0 means executed, resolved preview or cancellation; 1 means an error before dispatch; 2 means pending confirmation (including uncertain dry-runs); 3 means `EXECUTION_UNKNOWN` or an error with `dispatched: true`. Parse JSON even on nonzero exit and check `data.status`; `success: true` alone does not prove execution.
+- Use `--non-interactive` for CI: no login, URL or confirmation prompts and no pending files. Confident plans still execute. Default JSON/non-TTY mode retains confirmation IDs for user-approved follow-up commands.
+- On failure, read `error.code`, `error.dispatched` and available `meta.decisions` probabilities; atomic-command schemas may differ. Never automatically replay a write after `EXECUTION_UNKNOWN` or an error with `dispatched: true`. Inspect business state first. Do not lower model thresholds to force an action.
 
 ## Read only the reference needed now
 

@@ -32,7 +32,9 @@ const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
 ${resourceOverview()}
 
 page act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
+     --non-interactive（不提示交互、不保存待确认计划）
      --min-probability <0..1>（默认 0.85）、--min-margin <0..1>（默认 0.20）
+page act 退出码：0 完成或预览/取消；1 错误；2 待确认；3 执行未知或已派发后出错。
 ${browserOptionsHelp}
 会话：浏览器操作必须在动作后填写会话名，例如 page act demo "搜索 jev"。
 查看参数：jev-browser <资源> <动作> --help
@@ -78,7 +80,7 @@ async function main(): Promise<void> {
   if ((parsed.name === 'help' && !parsed.rest.length) || (parsed.name === 'act' && showingHelp)) {
     process.stdout.write(help); return;
   }
-  if (!showingHelp && !parsed.options.confirm && !parsed.options.cancel) await ensureLogin();
+  if (!showingHelp && !parsed.options.confirm && !parsed.options.cancel) await ensureLogin(parsed.options.nonInteractive);
   if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', 'Update the package with npm install -g jev-browser-cli.');
   if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', 'The dashboard is not included in this package.');
   const browser = new Browser(parsed.globals);
@@ -106,5 +108,5 @@ main().catch(error => {
   const result = failure(error);
   if (process.argv.includes('--json')) process.stdout.write(JSON.stringify(result) + '\n');
   else process.stderr.write(`${result.error.code}: ${result.error.message}\n`);
-  process.exitCode = 1;
+  process.exitCode = result.error.code === 'EXECUTION_UNKNOWN' || result.error.dispatched ? 3 : 1;
 });
