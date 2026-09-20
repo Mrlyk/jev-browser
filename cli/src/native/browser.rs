@@ -1384,6 +1384,12 @@ impl BrowserManager {
         &self.ws_url
     }
 
+    pub fn connection_info(&self) -> Value {
+        let managed = self.browser_process.is_some();
+        json!({ "kind": if managed { "managed" } else { "cdp" },
+            "headless": if managed { Some(self.headless) } else { None } })
+    }
+
     /// Returns the Chrome debug server address as "host:port".
     pub fn chrome_host_port(&self) -> &str {
         let stripped = self

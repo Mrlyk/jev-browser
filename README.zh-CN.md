@@ -1,6 +1,6 @@
 # jev-browser
 
-面向 AI Agent 的浏览器 CLI，用 Jev 理解自然语言，执行搜索、点击、填写和内容读取。
+在交互终端中用自然语言操作浏览器，也可通过结构化 CLI 命令供 AI Agent 调用。
 
 [English](README.md) | 简体中文
 
@@ -45,7 +45,43 @@ export TYPESAFE_API_KEY="你的 API Key"
 
 ## 3. 使用命令
 
-### 完成一次操作
+### 交互终端
+
+```bash
+jevb
+```
+
+连续输入“打开 https://example.com”“点击 Learn more 链接”等指令。输入框上方显示操作标签页、浏览器连接和模型提供方。默认创建独立会话并打开有头浏览器。
+
+```bash
+jevb tui --headless                   # 无头浏览器
+jevb tui --session demo               # 复用已有会话
+jevb tui --cdp 9222                   # 连接指定浏览器
+jevb tui --auto-connect               # 连接本机 Chrome
+jevb tui --model-provider openrouter  # 指定模型提供方
+```
+
+| 命令 | 用途 |
+| --- | --- |
+| `/back`、`/forward`、`/reload` | 后退、前进、刷新 |
+| `/up [px]`、`/down [px]`、`/top`、`/bottom` | 滚动页面 |
+| `/open <url>`、`/new [url]` | 打开页面、新建标签页 |
+| `/tabs`、`/tab <id>`、`/close [id]` | 选择、切换、关闭标签页 |
+| `/provider auto\|typesafe\|openrouter` | 切换本次会话的模型提供方 |
+| `/browser` | 选择浏览器连接，保留原浏览器 |
+| `/status` | 查看会话和连接统计 |
+| `/clear`、`/reset` | 清理显示、重置操作上下文 |
+| `/help`、`/quit` | 查看命令、退出 |
+
+Enter 发送，↑/↓ 浏览历史，Tab 补全命令或进入快捷栏，←/→ 移动光标或选择快捷操作。Esc 取消；Ctrl+C 在执行中取消、空闲时退出。粘贴多行文字后需按 Enter 才会发送。
+
+出现确认提示时，按需输入目标序号，再输入“确认”执行。页面改变会使旧确认失效。动作已经发送后，取消无法撤销它，请检查页面结果再继续。
+
+操作标签页绑定到会话，通过 `/tabs` 切换。`/quit` 保留浏览器，按退出时打印的命令重新连接；`/quit --close` 同时关闭本次交互创建的浏览器。
+
+未配置 Key 时仍可使用快捷命令。输入历史仅保存在内存中。交互模式需要终端；已有 CLI 命令和管道调用方式保持不变。
+
+### Agent 与脚本命令
 
 ```bash
 jevb page open demo https://www.baidu.com --headed
@@ -160,7 +196,14 @@ npm run dev
 npm install -g jev-browser-cli@latest
 ```
 
-功能回归使用 `npm test`。连接专用测试浏览器后，可运行 `JEV_TEST_CDP=9222 npm run test:smoke`；真实模型测试使用 `test:live`，需配置 `OPENROUTER_API_KEY`。
+功能回归使用 `npm test`。终端测试需要 macOS 或 Linux 及 Python 3；浏览器测试需连接专用 CDP 浏览器，`test:live`、`test:tui:live` 还需配置模型 Key。
+
+```bash
+npm run test:tui
+npm run test:connections
+JEV_TEST_CDP=9222 npm run test:smoke
+JEV_TEST_CDP=9222 npm run test:tui:live
+```
 
 打包或发布：
 

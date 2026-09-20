@@ -55,24 +55,31 @@ export function publicBrowserError(message: string, args: string[]): string {
 }
 
 export class Browser {
-  constructor(readonly args: string[], private env = coreEnv()) {}
+  constructor(readonly args: string[], private env = coreEnv(), private lifecycle: {
+    signal?: AbortSignal; onDispatch?: () => void; timeoutMs?: number; interactive?: boolean;
+  } = {}) {}
 
   async run(command: string[], options: { input?: string; passthrough?: boolean; progress?: boolean; timeoutMs?: number } = {}): Promise<CoreResult> {
+    this.lifecycle.signal?.throwIfAborted();
     const binary = corePath();
     try { await access(binary, constants.X_OK); }
     catch { throw new JevError('CORE_NOT_INSTALLED', 'Browser executor not found for this platform. For a source checkout, run npm run build:core; otherwise check package platform support.'); }
+    this.lifecycle.signal?.throwIfAborted();
     return new Promise((resolve, reject) => {
       const child = spawn(binary, [...this.args, ...command], {
         env: this.env, shell: false, windowsHide: true,
-        stdio: [options.input !== undefined ? 'pipe' : 'inherit', 'pipe', 'pipe'],
+        stdio: [options.input !== undefined ? 'pipe' : this.lifecycle.interactive ? 'ignore' : 'inherit', 'pipe', 'pipe'],
       });
       let stdout = '', stderr = '', timedOut = false, oversized = false, interrupted = false;
       const cancel = () => { interrupted = true; child.kill(); };
+      this.lifecycle.signal?.addEventListener('abort', cancel, { once: true });
       process.once('SIGINT', cancel);
       process.once('SIGTERM', cancel);
-      const timer = options.timeoutMs ? setTimeout(() => { timedOut = true; child.kill(); }, options.timeoutMs) : undefined;
+      const timeoutMs = options.timeoutMs ?? this.lifecycle.timeoutMs;
+      const timer = timeoutMs ? setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs) : undefined;
       const cleanup = () => {
         clearTimeout(timer);
+        this.lifecycle.signal?.removeEventListener('abort', cancel);
         process.removeListener('SIGINT', cancel);
         process.removeListener('SIGTERM', cancel);
       };
@@ -99,6 +106,8 @@ export class Browser {
   }
 
   async request(command: string[], options: { dispatch?: boolean; privateValue?: string } = {}): Promise<any> {
+    this.lifecycle.signal?.throwIfAborted();
+    if (options.dispatch) this.lifecycle.onDispatch?.();
     const batch = options.dispatch === true;
     const result = await this.run(batch ? ['--json', 'batch', '--bail'] : ['--json', ...command], {
       // The core applies operation deadlines after Chrome authorization finishes.

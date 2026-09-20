@@ -1,7 +1,7 @@
 {
   "name": "jev-browser-cli",
   "version": "0.1.3",
-  "description": "Browser automation CLI for AI agents, powered by the Jev model's millisecond decisions and near-zero inference costs",
+  "description": "Interactive browser terminal and automation CLI powered by Jev",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
@@ -29,6 +29,9 @@
     "test": "npm run build && node --test test/*.test.mjs",
     "test:smoke": "npm run build && node test/smoke.mjs",
     "test:live": "npm run build && node test/live.mjs",
+    "test:tui": "npm run build && python3 test/interactive-pty.py",
+    "test:tui:live": "npm run build && node test/interactive-live.mjs",
+    "test:connections": "npm run build && node test/transport-intervals.mjs",
     "test:skills": "npm run build && node test/skills.mjs",
     "check": "tsc --noEmit",
     "publish": "node scripts/publish.mjs",
@@ -36,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
     "typescript": "^5.9.0"
   },
   "repository": {
@@ -49,5 +53,10 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
+  },
+  "dependencies": {
+    "ink": "^7.1.1",
+    "react": "^19.3.0",
+    "undici": "^7.29.1"
   }
 }

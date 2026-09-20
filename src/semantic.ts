@@ -7,7 +7,7 @@ import { JevError, withDecisionMeta } from './errors.js';
 import { sites } from './sites.js';
 
 export type Uncertainty = { subject: string; message: string; probability: number; margin: number;
-  alternatives: Array<{ label: string; probability: number }> };
+  alternatives: Array<{ label: string; probability: number; ref?: string }> };
 export type Plan = {
   operation: Operation; target?: Candidate; value?: string; hiddenValue: boolean; submit: boolean;
   before: Snapshot; scope?: string; dryRun?: boolean; uncertainties: Uncertainty[];
@@ -39,7 +39,8 @@ function uncertainty(answer: Answer, context: { subject: string; labels: Record<
   if (probability >= options.probability && margin >= options.margin) return;
   return { subject: context.subject, probability, margin,
     message: margin < options.margin ? `关于「${context.subject}」，有多个接近的可能，请核对准备执行的操作。` : `关于「${context.subject}」，还不够确定，请核对后确认。`,
-    alternatives: ranked.filter(([, p]) => p > 0).slice(0, 3).map(([id, p]) => ({ label: context.labels[id] ?? id, probability: p })) };
+    alternatives: ranked.filter(([, p]) => p > 0).slice(0, 3).map(([id, p]) => ({ label: context.labels[id] ?? id, probability: p,
+      ...(options.interactive && /^e\d+$/.test(id) ? { ref: id } : {}) })) };
 }
 
 export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev): Promise<Plan> {
@@ -55,13 +56,23 @@ async function prepare(options: ActOptions, browser: Browser, jev: Jev): Promise
   const { before, tabGone } = await observeForPlanning(options, browser);
   const snapshotMs = Math.round(performance.now() - start);
   const built = buildQuestions(options, before);
-  const answers = Object.keys(built.questions).length ? (await jev.evaluate(built.state, built.questions)).answers : {};
+  const answers = Object.keys(built.questions).length ? (await jev.evaluate(built.state, built.questions, options.signal)).answers : {};
+  options.signal?.throwIfAborted();
   const uncertainties: Uncertainty[] = [];
   const pick = (id: string, subject: string): string => {
     const raw = answers[id];
     if (!raw) throw new JevError('NO_MATCH', `No candidates available for "${id}". Narrow the scope or provide a more specific instruction.`);
     const answer = asChoice(raw);
     const labels = built.questions[id].criteria;
+    if (options.interactive && answer.choice === 'ambiguous' && ['target', 'input_target'].includes(id)) {
+      const choices = Object.entries(answer.probabilities).filter(([key]) => /^e\d+$/.test(key))
+        .sort((a, b) => b[1] - a[1]).slice(0, 3);
+      if (choices.length) {
+        uncertainties.push({ subject, message: '请选择具体目标。', probability: 0, margin: 0,
+          alternatives: choices.map(([ref, probability]) => ({ ref, label: labels[ref], probability })) });
+        return choices[0][0];
+      }
+    }
     if (['none', 'ambiguous'].includes(answer.choice)) {
       const alternatives = Object.entries(answer.probabilities).filter(([key, p]) => !['none', 'ambiguous'].includes(key) && p > 0)
         .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key]) => labels[key]);

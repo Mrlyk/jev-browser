@@ -85,5 +85,6 @@ export function buildQuestions(options: ActOptions, before: Snapshot) {
     .map(c => ({ name: c.name, context: c.context })) : [];
   const pageInputs = inputs.map(c => ({ ref: c.ref, role: c.role, name: c.name, context: c.context }));
   return { questions, candidates, inputs, values, state: { instruction, operation: op,
+    ...(options.recent?.length ? { recentActions: options.recent } : {}),
     page: { url: before.origin, ...(buttons.length ? { buttons } : {}), ...(pageInputs.length ? { inputs: pageInputs } : {}) } } };
 }

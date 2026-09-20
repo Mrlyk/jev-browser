@@ -7031,6 +7031,7 @@ async fn handle_session_info(state: &DaemonState) -> Result<Value, String> {
         "socketDir": get_socket_dir().to_string_lossy(),
         "backgroundPid": std::process::id(),
         "browserLaunched": state.browser.is_some(),
+        "connection": state.browser.as_ref().map(|mgr| mgr.connection_info()),
         "pageCount": state.browser.as_ref().map(|mgr| mgr.page_count()).unwrap_or(0),
         "engine": state.engine,
         "launchHash": state.launch_hash,

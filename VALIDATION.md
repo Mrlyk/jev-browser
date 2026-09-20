@@ -108,3 +108,29 @@ Key 通过临时进程环境传入，没有写入项目文件或测试报告。
 对照组与实验组的 14 个场景中，请求端点与请求体、凭据文件内容、退出码和命令执行次数全部一致。覆盖手动和自动登录下的 `sk-`、无连字符 `sk`、旧 `sh-`、官方 Key，以及拒绝、取消、已有本地凭据和环境变量。失败或取消时不执行原命令，已有 Key 保留。内部有效性检查仍然执行，正常登录仅显示输入提示和成功结果。
 
 自动化回归 35/35 通过。实验脚本、三组构建和结果保存在本机 `.cache/login-ablation-sk/`；运行 `python3 .cache/login-ablation-sk/run.py` 可复现。本次实验验证行为等价与文字减少，未测量用户理解度或真实模型延迟。
+
+## 交互终端验证（2026-09-20）
+
+环境：macOS ARM64、Node.js 22.22.2、Chrome 153。浏览器使用独立测试实例，本地页面来自 `test/fixtures/page.html`。
+
+| 验证项 | 结果 |
+| --- | --- |
+| `JEV_TEST_NATIVE=1 npm test` | 109/109 通过，无跳过；覆盖旧 CLI、提供方选择、取消、确认失效、连接异常和代理 |
+| `npm run test:tui` | 真实 PTY 通过：裸入口、无 Key、中文及组合字符删除、多行粘贴、补全、历史、快捷栏、标签页选择、缩放、终端恢复；本轮首屏 319 ms |
+| `JEV_TEST_CDP=19347 npm run test:smoke` | 真实 Chrome 原有浏览器操作回归通过，模型响应为 synthetic |
+| `JEV_TEST_CDP=19347 npm run test:tui:live` | 真实 TypeSafe + Chrome，11 项断言通过；自然语言填写、提交确认、快捷操作零模型调用、退出保留会话；两次模型请求使用同一连接 |
+| `node test/interactive-managed.mjs` | 沙盒外验证默认有头、显式无头及仅关闭自有浏览器，全部通过 |
+| `npm run test:connections` | 1 秒、10 秒、30 秒间隔均复用同一实际连接 |
+| 受控 HTTP 回归 | 连续 20 次请求只有 1 条连接；401、异常 JSON、请求取消和服务器断开后均可继续；代理 CONNECT 不计入模型连接统计 |
+| 构建与打包 | TypeScript、Rust 构建、`cargo fmt --check`、`git diff --check`、`npm pack --dry-run` 通过，包中包含 18 个交互模块及 sourcemap 文件 |
+
+通过 `node test/model-reuse.mjs` 对相同的单个 Choice 问题采样，测量客户端完整 HTTP 请求耗时（包含网络及响应体读取）：
+
+| TypeSafe 请求方式 | 样本数 | P50 | P95 | 连接复用 |
+| --- | --- | --- | --- | --- |
+| 每次新建客户端和连接池 | 5 | 844 ms | 951 ms | 0/5 |
+| 同一个客户端和连接池 | 10 | 339 ms | 413 ms | 10/10，共 1 条连接 |
+
+本轮未配置 OpenRouter Key，其真实网络测试跳过；提供方切换、切回复用和双 Key 优先级由受控测试覆盖。首屏计时使用浏览器执行桩，模型耗时为上述小样本，均不包含浏览器启动时间。
+
+复现脚本位于 `test/interactive*.mjs`、`test/interactive-pty.py`、`test/transport*.mjs` 和 `test/model-reuse.mjs`。本机输出保存在 `.cache/tui-validation/`，真实模型结果另存于 `.cache/interactive-live.json`、`.cache/model-reuse.json`。

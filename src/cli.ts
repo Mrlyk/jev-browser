@@ -38,7 +38,8 @@ page act 退出码：0 完成或预览/取消；1 错误；2 待确认；3 执�
 ${browserOptionsHelp}
 会话：浏览器操作必须在动作后填写会话名，例如 page act demo "搜索 jev"。
 查看参数：jev-browser <资源> <动作> --help
-命令别名：jevb 与 jev-browser 等价；仅支持资源命令。
+命令别名：jevb 与 jev-browser 等价。
+交互模式：终端中直接运行 jevb，或使用 jevb tui；参数见 jevb tui --help。
 
 首次使用时会提示登录。
 `;
@@ -65,6 +66,11 @@ async function stdinValue(): Promise<string> {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  if (args[0] === 'tui' || (!args.length && process.stdin.isTTY && process.stdout.isTTY)) {
+    const { startInteractive } = await import('./interactive/index.js');
+    await startInteractive(args.slice(1));
+    return;
+  }
   if (!args.length || args[0] === '--help' || args[0] === '-h') {
     process.stdout.write(help); return;
   }

@@ -1,6 +1,6 @@
 # jev-browser
 
-A browser CLI for AI agents. Jev interprets natural-language instructions to search, click, fill fields, and read page content.
+Control your browser with natural language in an interactive terminal, or use structured CLI commands from an AI agent.
 
 English | [简体中文](README.zh-CN.md)
 
@@ -47,7 +47,43 @@ For non-interactive login, logout, and credential storage, see the [authenticati
 
 ## 3. Use commands
 
-### Complete an operation
+### Interactive terminal
+
+```bash
+jevb
+```
+
+Type instructions continuously, such as `Open https://example.com` or `Click Learn more`. The input area shows the selected tab, browser connection, and model provider. A new session opens a visible browser by default.
+
+```bash
+jevb tui --headless
+jevb tui --session demo
+jevb tui --cdp 9222
+jevb tui --auto-connect
+jevb tui --model-provider openrouter
+```
+
+| Command | Action |
+| --- | --- |
+| `/back`, `/forward`, `/reload` | Navigate or refresh |
+| `/up [px]`, `/down [px]`, `/top`, `/bottom` | Scroll |
+| `/open <url>`, `/new [url]` | Open a page or new tab |
+| `/tabs`, `/tab <id>`, `/close [id]` | Select, switch, or close a tab |
+| `/provider auto\|typesafe\|openrouter` | Change model provider for this session |
+| `/browser` | Choose a browser connection; the previous browser stays open |
+| `/status` | Show session and connection statistics |
+| `/clear`, `/reset` | Clear the display or reset operation context |
+| `/help`, `/quit` | Show commands or exit |
+
+Enter sends; ↑/↓ browse history; Tab completes commands or selects the action bar; ←/→ move the cursor or select an action. Esc cancels. Ctrl+C cancels an active operation or exits when idle. Pasted multiline text stays in the input until you send it.
+
+When prompted, enter a target number, then `yes` to confirm. Changing pages invalidates pending confirmations. Cancelling an action already sent to the browser cannot undo it; check the page before retrying.
+
+The selected tab stays bound to the session. Use `/tabs` to change it. `/quit` keeps the browser running; reconnect with the printed session command. `/quit --close` also closes a browser created by this interaction.
+
+No API key is needed for slash commands. Input history stays in memory. Interactive mode requires a terminal; existing CLI commands and piped calls retain their behavior.
+
+### Agent and script commands
 
 ```bash
 jevb page open demo https://www.baidu.com --headed
@@ -166,7 +202,14 @@ To restore a released version, use the same Node/npm installation. This replaces
 npm install -g jev-browser-cli@latest
 ```
 
-Run `npm test` for functional regressions. With a dedicated browser exposing CDP, run `JEV_TEST_CDP=9222 npm run test:smoke`. Real model tests use `test:live` and require `OPENROUTER_API_KEY`.
+Run `npm test` for functional regressions. Terminal tests require Python 3 on macOS or Linux. Browser tests require a dedicated CDP browser; `test:live` and `test:tui:live` also need a configured model key.
+
+```bash
+npm run test:tui
+npm run test:connections
+JEV_TEST_CDP=9222 npm run test:smoke
+JEV_TEST_CDP=9222 npm run test:tui:live
+```
 
 Package or publish:
 

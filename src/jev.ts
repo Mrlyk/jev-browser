@@ -73,24 +73,25 @@ export class Jev {
   readonly evidence: Array<Record<string, unknown>> = [];
   constructor(readonly config: ModelConfig, private request: typeof fetch = fetch) {}
 
-  async evaluate(state: unknown, questions: Record<string, Question>): Promise<Evaluation> {
+  async evaluate(state: unknown, questions: Record<string, Question>, signal?: AbortSignal): Promise<Evaluation> {
+    signal?.throwIfAborted();
     const entries = Object.entries(questions);
     const body = JSON.stringify({ model: this.config.model, state, questions });
     if (entries.every(([, q]) => Object.keys(q.criteria).length <= 255) && Buffer.byteLength(body) <= 48_000)
-      return this.send(body, questions);
+      return this.send(body, questions, signal);
     if (entries.length > 1) {
-      const results = await Promise.all(entries.map(([id, q]) => this.evaluate(state, { [id]: q })));
+      const results = await Promise.all(entries.map(([id, q]) => this.evaluate(state, { [id]: q }, signal)));
       return { model: results[0].model, answers: Object.assign({}, ...results.map(r => r.answers)) };
     }
     if (!entries.length || entries[0][1].type !== 'choice') throw this.contextTooLarge();
-    return this.evaluateBatches(state, entries[0]);
+    return this.evaluateBatches(state, entries[0], signal);
   }
 
   private contextTooLarge(): JevError {
     return new JevError('CONTEXT_TOO_LARGE', 'Model input still exceeds the 48 KB limit after batching. Narrow the scope with --scope.');
   }
 
-  private async evaluateBatches(state: unknown, [id, question]: [string, Question]): Promise<Evaluation> {
+  private async evaluateBatches(state: unknown, [id, question]: [string, Question], signal?: AbortSignal): Promise<Evaluation> {
     const escapes = Object.fromEntries(Object.entries(question.criteria).filter(([key]) => ['none', 'ambiguous'].includes(key)));
     const candidates = Object.entries(question.criteria).filter(([key]) => !Object.hasOwn(escapes, key));
     const batches: Question[] = [];
@@ -113,7 +114,7 @@ export class Jev {
     // Probabilities from separate Choice distributions must not be compared directly.
     const finalists: Record<string, string> = { ...escapes };
     for (let offset = 0; offset < batches.length; offset += 4) {
-      const results = await Promise.all(batches.slice(offset, offset + 4).map(q => this.evaluate(state, { [id]: q })));
+      const results = await Promise.all(batches.slice(offset, offset + 4).map(q => this.evaluate(state, { [id]: q }, signal)));
       for (const result of results) {
         const answer = asChoice(result.answers[id]);
         const ranked = Object.entries(answer.probabilities).filter(([key]) => !Object.hasOwn(escapes, key))
@@ -122,17 +123,20 @@ export class Jev {
       }
     }
     if (Object.keys(finalists).length >= Object.keys(question.criteria).length) throw this.contextTooLarge();
-    return this.evaluate(state, { [id]: { ...question, criteria: finalists } });
+    return this.evaluate(state, { [id]: { ...question, criteria: finalists } }, signal);
   }
 
-  private async send(body: string, questions: Record<string, Question>): Promise<Evaluation> {
+  private async send(body: string, questions: Record<string, Question>, signal?: AbortSignal): Promise<Evaluation> {
     const start = performance.now();
     try {
       const response = await this.request(this.config.endpoint, {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+        method: 'POST', redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
         headers: { Authorization: `Bearer ${this.config.key}`, 'Content-Type': 'application/json' }, body,
       });
-      if (!response.ok) throw new JevError(`MODEL_HTTP_${response.status}`, `${this.config.transport} returned HTTP ${response.status}. No action was taken.`);
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {});
+        throw new JevError(`MODEL_HTTP_${response.status}`, `${this.config.transport} returned HTTP ${response.status}. No action was taken.`);
+      }
       const raw = await response.json();
       const result = validateEvaluation(raw, questions);
       this.evidence.push({ transport: this.config.transport, requestedModel: this.config.model,
@@ -140,6 +144,7 @@ export class Jev {
         usage: result.usage, answers: result.answers, durationMs: Math.round(performance.now() - start) });
       return result;
     } catch (error) {
+      signal?.throwIfAborted();
       if (error instanceof JevError) throw error;
       if (error instanceof SyntaxError) throw new JevError('INVALID_MODEL_RESPONSE', 'The model returned invalid JSON.');
       throw new JevError('MODEL_UNAVAILABLE', `${this.config.transport} request failed or timed out. No fallback provider was used.`);
