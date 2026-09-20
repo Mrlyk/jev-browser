@@ -114,7 +114,7 @@ jevb page act mychrome "搜索 jev" --auto-connect --pin-tab
 
 将 `t2` 替换为列表中的目标标签页 ID，后续保持同一会话名。以上参数也可通过 `jevb help`、`jevb help browser connect`、`jevb help page act` 或 `jevb help tab list` 查看。
 
-点击当前绑定页的链接打开新标签页时，会话自动跟随新页，后续命令继续操作该页。直接用 `tab create` 创建标签页也会切换绑定。手动切到其他已有标签页时，使用 `tab switch` 明确选择；绑定页关闭后需重新选择。
+点击当前绑定页的链接打开新标签页时，会话自动跟随新页，后续命令继续操作该页。直接用 `tab create` 创建标签页也会切换绑定。手动切到其他已有标签页时，使用 `tab switch` 明确选择。绑定页关闭后，`jevb page act demo "打开百度"` 这类打开网页操作会新建标签页；点击、填写仍需重新选择页面。`session clear` 会清除全部会话的标签页绑定，包括已退出的会话。
 
 ### 预览与确认
 

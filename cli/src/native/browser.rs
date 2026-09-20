@@ -628,9 +628,17 @@ impl BrowserManager {
         headers: Option<Vec<(String, String)>>,
     ) -> Result<Self, String> {
         let ws_url = resolve_cdp_url(url).await?;
-        let client = Arc::new(CdpClient::connect_with_headers(&ws_url, headers).await?);
+        let client = CdpClient::connect_with_headers(&ws_url, headers).await?;
+        Self::from_cdp_connection(ws_url, client, direct_page).await
+    }
+
+    async fn from_cdp_connection(
+        ws_url: String,
+        client: CdpClient,
+        direct_page: bool,
+    ) -> Result<Self, String> {
         let mut manager = Self {
-            client,
+            client: Arc::new(client),
             browser_process: None,
             ws_url,
             pages: Vec::new(),
@@ -673,8 +681,8 @@ impl BrowserManager {
     }
 
     pub async fn connect_auto() -> Result<Self, String> {
-        let ws_url = auto_connect_cdp().await?;
-        Self::connect_cdp(&ws_url).await
+        let (ws_url, client) = auto_connect_cdp().await?;
+        Self::from_cdp_connection(ws_url, client, false).await
     }
 
     async fn discover_and_attach_targets(&mut self) -> Result<(), String> {
@@ -4490,6 +4498,23 @@ mod tests {
         });
 
         (url, activations)
+    }
+
+    /// Browser initialization must not open a second authorized connection.
+    #[tokio::test]
+    async fn initializes_browser_with_existing_authorized_connection() {
+        // This server accepts one WebSocket only. Reconnecting here would hang.
+        let (url, _) = start_mock_cdp_connect(vec![("ALIVE", true)], false).await;
+        let client = CdpClient::connect(&url).await.unwrap();
+        let mut manager = tokio::time::timeout(
+            Duration::from_secs(3),
+            BrowserManager::from_cdp_connection(url, client, false),
+        )
+        .await
+        .expect("initialization must reuse the authorized connection")
+        .unwrap();
+        assert_eq!(manager.active_target_id().unwrap(), "ALIVE");
+        manager.close().await.unwrap();
     }
 
     /// Regression test for #1036: connecting to a browser whose first target is

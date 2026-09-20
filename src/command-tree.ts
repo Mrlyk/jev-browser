@@ -66,7 +66,7 @@ export function requiresSession(args: string[]): boolean {
 }
 
 const usages: Record<string, string> = {
-  'session clear': '[--json]（关闭全部运行中的会话，无需会话名）',
+  'session clear': '[--json]（关闭全部会话并清除保存的标签页绑定，无需会话名）',
   'session list': '[--json]', 'session ls': '[--json]', 'session current': '[--json]',
   'session inspect': '[--json]', 'session info': '[--json]',
   'session id': '[--scope worktree|cwd|git-root] [--prefix <前缀>]',

@@ -116,6 +116,8 @@ jevb page act mychrome "Search for jev" --auto-connect --pin-tab
 
 Replace `t2` with the target tab ID from the list and keep using the same session name. These options also appear in `jevb help`, `jevb help browser connect`, `jevb help page act`, and `jevb help tab list`.
 
+If a bound tab has closed, a `page act` instruction to open a website creates a new tab. Clicking or filling still requires selecting a page. `session clear` removes all saved tab bindings, including those left by sessions that have already exited.
+
 ### Preview and confirm
 
 Inspect a plan without executing it:

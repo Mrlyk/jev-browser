@@ -240,6 +240,14 @@ impl CdpClient {
         .await
         .map_err(|e| format!("CDP WebSocket connect failed: {}", e))?;
 
+        Self::from_stream(ws_stream)
+    }
+
+    pub fn from_stream(
+        ws_stream: tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    ) -> Result<Self, String> {
         enable_tcp_keepalive(ws_stream.get_ref());
         let tcp_stream = underlying_tcp_stream(ws_stream.get_ref())
             .ok_or_else(|| "Unsupported CDP stream type".to_string())?;

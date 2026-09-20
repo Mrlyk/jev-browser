@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,11 +101,13 @@ test('session clear routes to close all and rejects operands before login', t =>
 });
 
 nativeTest('session clear closes every daemon and succeeds again on an empty runtime', t => {
-  const { run } = fixture(t);
+  const { root, run } = fixture(t);
   const env = { TYPESAFE_API_KEY: 'local-test-placeholder' };
+  const directory = join(root, 'run', 'namespaces', 'jev', 'run');
   for (const session of ['first', 'second']) {
     const started = run(['stream', 'status', session, '--json'], env);
     assert.equal(started.status, 0, started.stderr);
+    writeFileSync(join(directory, `${session}.target`), JSON.stringify({ targetId: 'closed-tab', url: '', pinned: true }));
   }
   const cleared = run(['session', 'clear', '--json'], env);
   assert.equal(cleared.status, 0, cleared.stderr);
@@ -113,12 +115,33 @@ nativeTest('session clear closes every daemon and succeeds again on an empty run
   assert.equal(response.success, true);
   assert.equal(response.data.closed, 2);
   assert.deepEqual(response.data.sessions.sort(), ['first', 'second']);
+  for (const session of ['first', 'second']) assert.equal(existsSync(join(directory, `${session}.target`)), false);
   const remaining = run(['session', 'list', '--json'], env);
   assert.equal(remaining.status, 0, remaining.stderr);
   assert.deepEqual(JSON.parse(remaining.stdout).data.sessions, []);
   const empty = run(['session', 'clear', '--json'], env);
   assert.equal(empty.status, 0, empty.stderr);
   assert.deepEqual(JSON.parse(empty.stdout), { success: true, data: { closed: 0, sessions: [] } });
+});
+
+nativeTest('session clear removes saved bindings even when session list is empty', t => {
+  const { root, run } = fixture(t);
+  const env = { TYPESAFE_API_KEY: 'local-test-placeholder' };
+  const directory = join(root, 'run', 'namespaces', 'jev', 'run');
+  const unrelated = join(root, 'run', 'namespaces', 'other', 'run');
+  for (const path of [directory, unrelated]) mkdirSync(path, { recursive: true });
+  const binding = JSON.stringify({ targetId: 'closed-tab', url: 'https://www.baidu.com/s', pinned: true });
+  writeFileSync(join(directory, 'demo.target'), binding);
+  writeFileSync(join(unrelated, 'keep.target'), binding);
+  const listed = run(['session', 'list', '--json'], env);
+  assert.equal(listed.status, 0, listed.stderr);
+  assert.deepEqual(JSON.parse(listed.stdout).data.sessions, []);
+  assert.ok(existsSync(join(directory, 'demo.target')));
+  const cleared = run(['session', 'clear', '--json'], env);
+  assert.equal(cleared.status, 0, cleared.stderr);
+  assert.deepEqual(JSON.parse(cleared.stdout).data.sessions, ['demo']);
+  assert.equal(existsSync(join(directory, 'demo.target')), false);
+  assert.ok(existsSync(join(unrelated, 'keep.target')));
 });
 
 nativeTest('real executor names the closed session in text and JSON without launching a browser', t => {

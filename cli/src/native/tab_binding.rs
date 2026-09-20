@@ -146,6 +146,34 @@ pub fn clear(session: &str) {
     let _ = fs::remove_file(binding_path(session));
 }
 
+/// Explicit session clear also removes bindings whose daemon has already exited.
+/// Sessions that failed to close retain their binding and pin state.
+pub fn clear_saved_bindings(excluded: &[String]) -> Result<Vec<String>, String> {
+    let entries = match fs::read_dir(crate::connection::get_socket_dir()) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("Cannot list saved tab bindings: {}", e)),
+    };
+    let mut cleared = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Cannot read saved tab binding: {}", e))?;
+        let name = entry.file_name();
+        let Some(session) = name.to_str().and_then(|name| name.strip_suffix(".target")) else {
+            continue;
+        };
+        if session.is_empty() || excluded.iter().any(|name| name == session) {
+            continue;
+        }
+        match fs::remove_file(entry.path()) {
+            Ok(()) => cleared.push(session.to_string()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("Cannot clear tab binding for {}: {}", session, e)),
+        }
+    }
+    cleared.sort();
+    Ok(cleared)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +189,31 @@ mod tests {
         guard.remove("XDG_RUNTIME_DIR");
         guard.remove("AGENT_BROWSER_NAMESPACE");
         f();
+    }
+
+    #[test]
+    fn clear_saved_bindings_removes_orphans_and_preserves_failed_sessions() {
+        with_socket_dir(|| {
+            let binding = TabBinding {
+                target_id: "gone".into(),
+                url: String::new(),
+                pinned: true,
+            };
+            for session in ["stopped", "failed"] {
+                save(session, &binding).unwrap();
+            }
+            let other = crate::connection::get_socket_dir().join("config.json");
+            fs::write(&other, "{}").unwrap();
+            assert_eq!(
+                clear_saved_bindings(&["failed".into()]).unwrap(),
+                vec!["stopped"]
+            );
+            assert_eq!(load("stopped").unwrap(), None);
+            assert_eq!(load("failed").unwrap(), Some(binding));
+            assert!(other.exists());
+            assert_eq!(clear_saved_bindings(&[]).unwrap(), vec!["failed"]);
+            assert!(clear_saved_bindings(&[]).unwrap().is_empty());
+        });
     }
 
     #[test]

@@ -7,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
+use super::client::CdpClient;
 use super::discovery::discover_cdp_url;
 use crate::ca_bundle::CaBundle;
 
@@ -1146,15 +1147,15 @@ pub fn read_devtools_active_port(user_data_dir: &Path) -> Option<(u16, String)> 
     Some((port, ws_path))
 }
 
-pub async fn auto_connect_cdp() -> Result<String, String> {
+pub async fn auto_connect_cdp() -> Result<(String, CdpClient), String> {
     auto_connect_from_dirs(&get_chrome_user_data_dirs()).await
 }
 
-async fn auto_connect_from_dirs(user_data_dirs: &[PathBuf]) -> Result<String, String> {
+async fn auto_connect_from_dirs(user_data_dirs: &[PathBuf]) -> Result<(String, CdpClient), String> {
     for dir in user_data_dirs {
         if let Some((port, ws_path)) = read_devtools_active_port(dir) {
-            if let Some(ws_url) = resolve_cdp_from_active_port(port, &ws_path).await? {
-                return Ok(ws_url);
+            if let Some(connection) = resolve_cdp_from_active_port(port, &ws_path).await? {
+                return Ok(connection);
             }
             // Chrome owns this file. A failed probe does not prove it is stale.
         }
@@ -1162,43 +1163,62 @@ async fn auto_connect_from_dirs(user_data_dirs: &[PathBuf]) -> Result<String, St
 
     // Fallback: probe common ports
     for port in [9222u16, 9229] {
-        if let Some(ws_url) = resolve_cdp_from_active_port(port, "/devtools/browser").await? {
-            return Ok(ws_url);
+        if let Some(connection) = resolve_cdp_from_active_port(port, "/devtools/browser").await? {
+            return Ok(connection);
         }
     }
 
     Err("No running Chrome instance found. Launch Chrome with --remote-debugging-port or use --cdp.".to_string())
 }
 
-/// Resolve a CDP WebSocket URL from a DevToolsActivePort entry.
+/// Connect using a DevToolsActivePort entry and retain the authorized transport.
 ///
 /// Tries the exact WebSocket path from DevToolsActivePort first (single
 /// prompt on M144+), then falls back to legacy HTTP discovery for older
-/// Chrome versions. This order avoids triggering duplicate remote-debugging
-/// permission prompts (#1210, #1206).
-async fn resolve_cdp_from_active_port(port: u16, ws_path: &str) -> Result<Option<String>, String> {
+/// Chrome versions. Returning the live client avoids a second authorization
+/// prompt when browser initialization starts.
+async fn resolve_cdp_from_active_port(
+    port: u16,
+    ws_path: &str,
+) -> Result<Option<(String, CdpClient)>, String> {
     let ws_url = format!("ws://127.0.0.1:{}{}", port, ws_path);
-    if verify_ws_endpoint(&ws_url).await? {
-        return Ok(Some(ws_url));
+    if let Some(client) = verify_ws_endpoint(&ws_url).await? {
+        return Ok(Some((ws_url, client)));
     }
 
     // Pre-M144 fallback: HTTP endpoints (/json/version, /json/list, etc.)
-    Ok(discover_cdp_url("127.0.0.1", port, None).await.ok())
+    if let Ok(ws_url) = discover_cdp_url("127.0.0.1", port, None).await {
+        let client = CdpClient::connect(&ws_url).await?;
+        return Ok(Some((ws_url, client)));
+    }
+    Ok(None)
 }
 
 /// Verify that a WebSocket endpoint is a live CDP server by sending
 /// `Browser.getVersion` and checking for a valid response.
-async fn verify_ws_endpoint(ws_url: &str) -> Result<bool, String> {
+async fn verify_ws_endpoint(ws_url: &str) -> Result<Option<CdpClient>, String> {
     use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
     use tokio_tungstenite::tungstenite::{Error, Message};
 
     // Keep the same connection open while Chrome waits for the user's answer.
-    let (mut ws, _) = match tokio_tungstenite::connect_async(ws_url).await {
+    let config = WebSocketConfig {
+        max_message_size: None,
+        max_frame_size: None,
+        ..Default::default()
+    };
+    let (mut ws, _) = match tokio_tungstenite::connect_async_with_config(
+        ws_url,
+        Some(config),
+        false,
+    )
+    .await
+    {
         Ok(connection) => connection,
         Err(Error::Http(response)) if response.status().as_u16() != 404 => {
             return Err(format!("Chrome rejected the remote debugging connection ({}). Allow access in Chrome and retry.", response.status()));
         }
-        Err(_) => return Ok(false),
+        Err(_) => return Ok(None),
     };
     let cmd = r#"{"id":1,"method":"Browser.getVersion"}"#;
     ws.send(Message::Text(cmd.into()))
@@ -1209,8 +1229,7 @@ async fn verify_ws_endpoint(ws_url: &str) -> Result<bool, String> {
             Ok(Message::Text(text)) => {
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
                     if v.get("id").and_then(|id| id.as_u64()) == Some(1) {
-                        let _ = ws.close(None).await;
-                        return Ok(true);
+                        return CdpClient::from_stream(ws).map(Some);
                     }
                 }
             }
@@ -2699,8 +2718,12 @@ mod tests {
             // accept: verify_ws_endpoint() WebSocket handshake
             let (stream, _) = listener.accept().await.unwrap();
             let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
-            if let Some(Ok(WsMsg::Text(text))) = ws.next().await {
+            for method in ["Browser.getVersion", "Target.getTargets"] {
+                let Some(Ok(WsMsg::Text(text))) = ws.next().await else {
+                    panic!("authorized connection closed before {method}");
+                };
                 let req: serde_json::Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(req["method"], method);
                 let id = req.get("id").unwrap();
                 let reply = format!(
                     r#"{{"id":{},"result":{{"protocolVersion":"1.3","product":"Chrome/147"}}}}"#,
@@ -2712,14 +2735,26 @@ mod tests {
         });
 
         let result = resolve_cdp_from_active_port(port, &ws_path).await;
-        assert!(result.is_ok(), "should succeed: {:?}", result);
-        let url = result.unwrap().expect("verified endpoint");
+        assert!(
+            result.is_ok(),
+            "should succeed: {:?}",
+            result.as_ref().err()
+        );
+        let (url, client) = result.unwrap().expect("verified endpoint");
         assert!(
             url.contains("test-uuid-1234"),
             "should use exact ws_path from DevToolsActivePort, got: {}",
             url
         );
         assert_eq!(url, format!("ws://127.0.0.1:{}{}", port, ws_path));
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            client.send_command("Target.getTargets", None, None),
+        )
+        .await
+        .expect("the authorized connection must be reused")
+        .unwrap();
+        client.close().await;
         server.await.unwrap();
     }
 
@@ -2751,16 +2786,28 @@ mod tests {
                 body
             );
             s2.write_all(resp.as_bytes()).await.unwrap();
+            drop(s2);
+
+            // Connect to the discovered endpoint exactly once.
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            use futures_util::SinkExt;
+            let _ = ws.close(None).await;
         });
 
         let result = resolve_cdp_from_active_port(port, "/devtools/browser/nonexistent-uuid").await;
-        assert!(result.is_ok(), "should fall back to HTTP: {:?}", result);
-        let url = result.unwrap().expect("HTTP discovery endpoint");
+        assert!(
+            result.is_ok(),
+            "should fall back to HTTP: {:?}",
+            result.as_ref().err()
+        );
+        let (url, client) = result.unwrap().expect("HTTP discovery endpoint");
         assert!(
             url.contains("fallback-uuid"),
             "should use HTTP discovery fallback, got: {}",
             url
         );
+        client.close().await;
         server.await.unwrap();
     }
 
@@ -2777,7 +2824,7 @@ mod tests {
         )
         .await
         .expect("a closed port must not wait for authorization");
-        assert_eq!(result.unwrap(), None);
+        assert!(result.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -2812,7 +2859,7 @@ mod tests {
                 let _ = ws.close(None).await;
             });
 
-            let result = tokio::time::timeout(
+            let (url, client) = tokio::time::timeout(
                 Duration::from_secs(8),
                 auto_connect_from_dirs(&[profile.path().to_path_buf()]),
             )
@@ -2820,10 +2867,11 @@ mod tests {
             .expect("approval should finish promptly")
             .unwrap();
             assert_eq!(
-                result,
+                url,
                 format!("ws://127.0.0.1:{}/devtools/browser/approval", port)
             );
             assert_eq!(std::fs::read_to_string(active_port).unwrap(), content);
+            client.close().await;
             server.await.unwrap();
         }
     }
@@ -2859,7 +2907,8 @@ mod tests {
 
         let error = auto_connect_from_dirs(&[profile.path().to_path_buf()])
             .await
-            .unwrap_err();
+            .err()
+            .expect("authorization should be rejected");
         assert!(
             error.contains("Chrome rejected the remote debugging connection (403 Forbidden)"),
             "{error}"

@@ -1258,27 +1258,27 @@ fn run_close_all(flags: &Flags) {
         .map(|s| (s.name.clone(), s.pid))
         .collect();
 
-    if sessions.is_empty() {
-        if flags.json {
-            print_json_value(json!({
-                "success": true,
-                "data": { "closed": 0, "sessions": [] },
-            }));
-        } else {
-            println!("No active sessions");
-        }
-        return;
-    }
-
     let mut closed: Vec<String> = Vec::new();
     let mut failed: Vec<(String, String)> = Vec::new();
 
     for (session, pid) in &sessions {
         let cmd = json!({ "id": gen_id(), "action": "close" });
         match send_command(cmd, session) {
-            Ok(resp) if resp.success => closed.push(session.clone()),
+            Ok(resp)
+                if resp.success
+                    && resp
+                        .data
+                        .as_ref()
+                        .and_then(|data| data.get("closed"))
+                        .and_then(serde_json::Value::as_bool)
+                        == Some(true) =>
+            {
+                closed.push(session.clone());
+            }
             Ok(resp) => {
-                let err = resp.error.unwrap_or_else(|| "Unknown error".to_string());
+                let err = resp.error.unwrap_or_else(|| {
+                    "Session close did not complete; confirmation may be required".to_string()
+                });
                 failed.push((session.clone(), err));
             }
             Err(_) => {
@@ -1301,6 +1301,26 @@ fn run_close_all(flags: &Flags) {
                 closed.push(session.clone());
             }
         }
+    }
+
+    let excluded: Vec<String> = failed.iter().map(|(session, _)| session.clone()).collect();
+    match native::tab_binding::clear_saved_bindings(&excluded) {
+        Ok(saved) => {
+            for session in saved {
+                if !closed.contains(&session) {
+                    closed.push(session);
+                }
+            }
+        }
+        Err(error) => failed.push(("saved tab bindings".to_string(), error)),
+    }
+    if closed.is_empty() && failed.is_empty() {
+        if flags.json {
+            print_json_value(json!({"success": true, "data": {"closed": 0, "sessions": []}}));
+        } else {
+            println!("No active sessions or saved tab bindings");
+        }
+        return;
     }
 
     if flags.json {

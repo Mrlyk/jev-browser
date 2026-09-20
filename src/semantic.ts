@@ -11,6 +11,7 @@ export type Uncertainty = { subject: string; message: string; probability: numbe
 export type Plan = {
   operation: Operation; target?: Candidate; value?: string; hiddenValue: boolean; submit: boolean;
   before: Snapshot; scope?: string; dryRun?: boolean; uncertainties: Uncertainty[];
+  newTab?: boolean;
   afterPage?: PageContext;
   meta: { modelRequests: number; decisions: Jev['evidence']; timings: Record<string, number>;
     snapshotId: string; candidateCount: number; truncated: boolean; scope?: string; valueSource?: string };
@@ -18,6 +19,17 @@ export type Plan = {
 
 async function observe(browser: Browser, scope?: string): Promise<Snapshot> {
   return snapshot(await browser.request(['snapshot', ...(scope ? ['-s', scope] : [])]));
+}
+
+async function observeForPlanning(options: ActOptions, browser: Browser) {
+  try { return { before: await observe(browser, options.scope), tabGone: undefined }; }
+  catch (error) {
+    if (!(error instanceof JevError) || error.code !== 'BROWSER_ERROR' ||
+      !error.message.startsWith('tab_gone:') || (options.op && options.op !== 'open')) throw error;
+    // No page was observed. Only a context-free open instruction may proceed.
+    const before: Snapshot = { id: 'tab-gone', origin: '', pageId: '', frameId: null, candidates: [] };
+    return { before, tabGone: error };
+  }
 }
 
 function uncertainty(answer: Answer, context: { subject: string; labels: Record<string, string> }, options: ActOptions): Uncertainty | undefined {
@@ -35,7 +47,7 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
   if (options.op && options.op !== 'open' && needsValue.has(options.op) && options.value === undefined &&
     !Object.keys(['fill', 'type'].includes(options.op) ? inputValues(options.instruction) : valueOptions(options.op, options.instruction)).length)
     throw new JevError('NEEDS_INPUT', 'No input value found. Quote the text or provide --value / --value-stdin.');
-  const before = await observe(browser, options.scope);
+  const { before, tabGone } = await observeForPlanning(options, browser);
   const snapshotMs = Math.round(performance.now() - start);
   const built = buildQuestions(options, before);
   const answers = Object.keys(built.questions).length ? (await jev.evaluate(built.state, built.questions)).answers : {};
@@ -56,6 +68,7 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
     return answer.choice;
   };
   const intent = options.op ?? pick('operation', '要执行的动作');
+  if (tabGone && intent !== 'open') throw tabGone;
   if (intent === 'multi_step') throw new JevError('MULTI_STEP_UNSUPPORTED', 'Multiple independent actions are not supported. Split them into separate commands; typing and submitting the same input can be combined.');
   if (intent === 'unsupported') throw new JevError('UNSUPPORTED_OPERATION', 'The instruction prohibits execution or does not describe a supported browser action. No action was taken.');
   const clear = intent === 'input' ? pick('clear', '是否清空原有内容') === 'true' : intent === 'fill';
@@ -82,6 +95,7 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
   }
   command(op, { ref: target?.ref, value });
   return { operation: op, target, value, hiddenValue: options.value !== undefined, submit, before,
+    ...(tabGone ? { newTab: true } : {}),
     scope: options.scope, dryRun: options.dryRun, uncertainties,
     meta: { modelRequests: jev.evidence.length, decisions: jev.evidence, timings: { snapshotMs, totalMs: Math.round(performance.now() - start) },
       snapshotId: before.id, candidateCount: candidates.length, truncated: false, scope: options.scope,
@@ -89,6 +103,12 @@ export async function prepareAct(options: ActOptions, browser: Browser, jev: Jev
 }
 
 export async function validatePlan(plan: Plan, browser: Browser): Promise<void> {
+  if (plan.newTab) {
+    if (plan.operation !== 'open' || plan.target)
+      throw new JevError('INVALID_PLAN', 'Only opening a URL can recover a closed tab.');
+    command('open', { value: plan.value });
+    return;
+  }
   const current = await observe(browser, plan.scope);
   if (plan.target) assertFresh(plan.before, current, plan.target);
   else if (plan.before.origin !== current.origin || plan.before.pageId !== current.pageId || plan.before.frameId !== current.frameId)
@@ -105,7 +125,9 @@ export async function validatePlan(plan: Plan, browser: Browser): Promise<void> 
 export function planResult(plan: Plan, status: 'needs_confirmation' | 'resolved' | 'executed' | 'cancelled', result?: unknown) {
   return { success: true, data: { status, operation: plan.operation, target: plan.target,
     session: plan.before.pageContext?.session, pageContext: plan.afterPage ?? plan.before.pageContext,
-    plan: { page: plan.before.origin, action: operations[plan.operation],
+    plan: { page: plan.newTab ? '新标签页' : plan.before.origin,
+      action: plan.newTab ? '新建标签页并打开网页' : operations[plan.operation],
+      ...(plan.newTab ? { newTab: true } : {}),
       tabId: plan.before.pageContext?.tabId, title: plan.before.pageContext?.title,
       target: plan.target ? describe(plan.target) : undefined,
       value: plan.value === undefined ? undefined : plan.hiddenValue ? '（输入内容已隐藏）' : plan.value,
@@ -126,7 +148,8 @@ export async function executePlan(plan: Plan, browser: Browser, confirmed = fals
   let dispatched = false;
   try {
     dispatched = true;
-    const result = await browser.request(command(plan.operation, { ref: plan.target?.ref, value: plan.value }), { dispatch: true, privateValue: plan.value });
+    const args = plan.newTab ? ['tab', 'new', plan.value!] : command(plan.operation, { ref: plan.target?.ref, value: plan.value });
+    const result = await browser.request(args, { dispatch: true, privateValue: plan.value });
     plan.afterPage = pageContext(result?.pageContext);
     if (plan.submit) {
       // Do not submit on a new page or a replaced field after input handlers run.

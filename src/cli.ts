@@ -22,7 +22,7 @@ const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
   page act demo --confirm <编号>  确认执行已展示的计划
   page act demo --cancel <编号>   取消待确认计划
   session close <会话名>    关闭指定会话，例如 session close demo
-  session clear             一次关闭全部会话，无需会话名
+  session clear             关闭全部会话并清除标签页绑定，无需会话名
   session list              列出运行中的会话
   auth login                登录
   auth login --with-token    从标准输入登录
@@ -44,7 +44,7 @@ ${browserOptionsHelp}
 const closeHelp = `用法：jev-browser session close <会话名>
 
   jev-browser session close demo     关闭 demo 会话
-  jev-browser session clear          关闭全部会话
+  jev-browser session clear          关闭全部会话并清除标签页绑定
 
 close 必须填写会话名；关闭全部会话请使用 session clear。连接自己的 Chrome 时只断开控制连接。
 `;

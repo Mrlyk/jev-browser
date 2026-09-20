@@ -300,3 +300,59 @@ test('未知或歧义网站请求完整网址，低置信度匹配仍需确认',
   await executePlan(plan, s.browser, true);
   assert.deepEqual(s.commands.at(-1).args, ['open', 'https://www.google.com']);
 });
+
+function missingTab(selections, failure) {
+  const s = setup(selections);
+  const original = s.browser.request;
+  s.browser.request = async (args, config) => {
+    if (args[0] === 'snapshot') throw new JevError('BROWSER_ERROR', 'tab_gone: bound tab is gone');
+    const result = await original(args, config);
+    if (failure) throw failure;
+    return { ...result, pageContext: { session: 'demo', tabId: 't2', targetId: 'new-target',
+      title: '百度', url: 'https://www.baidu.com' } };
+  };
+  return s;
+}
+
+test('绑定页关闭后打开网页只新建一次，预览不会创建标签页', async () => {
+  for (const dryRun of [false, true]) {
+    const s = missingTab({ operation: 'open', url: 'baidu' });
+    const result = await act(options({ op: undefined, instruction: '打开baidu', dryRun }), s.browser, s.jev);
+    assert.equal(result.data.status, dryRun ? 'resolved' : 'executed');
+    assert.equal(result.data.plan.newTab, true);
+    assert.equal(result.data.plan.page, '新标签页');
+    assert.deepEqual(s.commands.map(c => c.args), dryRun ? [] : [['tab', 'new', 'https://www.baidu.com']]);
+    if (!dryRun) assert.equal(result.data.pageContext.tabId, 't2');
+  }
+});
+
+test('绑定页关闭后点击、填写和其他页面操作仍失败', async () => {
+  for (const [op, selected] of [['click', 'click'], ['fill', 'input'], [undefined, 'click'], [undefined, 'input']]) {
+    const s = missingTab({ operation: selected });
+    await assert.rejects(act(options({ op, value: op === 'fill' ? 'hello' : undefined }), s.browser, s.jev),
+      error => error.code === 'BROWSER_ERROR' && error.message.startsWith('tab_gone:'));
+    assert.deepEqual(s.commands, []);
+  }
+});
+
+test('缺页新建计划仍需确认低置信度网址，保存后确认只执行一次', async () => {
+  const s = missingTab({ operation: 'open', url: { choice: 'baidu', probabilities: { baidu: .6, none: .4 } } });
+  const plan = await prepareAct(options({ op: undefined, instruction: '打开百度' }), s.browser, s.jev);
+  assert.equal((await executePlan(plan, s.browser)).data.status, 'needs_confirmation');
+  assert.deepEqual(s.commands, []);
+  await executePlan(JSON.parse(JSON.stringify(plan)), s.browser, true);
+  assert.deepEqual(s.commands.map(c => c.args), [['tab', 'new', 'https://www.baidu.com']]);
+});
+
+test('缺页恢复失败不重放，其他连接错误和非法网址不会触发新建', async () => {
+  const s = missingTab({ operation: 'open', url: 'baidu' }, new JevError('EXECUTION_UNKNOWN', 'connection closed', true));
+  await assert.rejects(act(options({ op: undefined, instruction: '打开百度' }), s.browser, s.jev), { code: 'EXECUTION_UNKNOWN' });
+  assert.equal(s.commands.length, 1);
+  const invalid = missingTab({});
+  await assert.rejects(act(options({ op: 'open', value: 'javascript:alert(1)' }), invalid.browser, invalid.jev), { code: 'INVALID_VALUE' });
+  assert.deepEqual(invalid.commands, []);
+  const failed = setup({ operation: 'open', url: 'baidu' });
+  failed.browser.request = async () => { throw new JevError('BROWSER_ERROR', 'Chrome rejected the connection'); };
+  await assert.rejects(act(options({ op: undefined, instruction: '打开百度' }), failed.browser, failed.jev), /Chrome rejected/);
+  assert.equal(failed.requests.length, 0);
+});
