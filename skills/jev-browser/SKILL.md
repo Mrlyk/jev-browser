@@ -1,6 +1,6 @@
 ---
 name: jev-browser
-description: Use the jev-browser CLI for natural-language browser actions, form filling, page reading, and E2E interaction steps. Use when jev-browser is requested or is the chosen browser execution tool. The calling model plans and verifies the workflow; Jev selects targets for individual actions.
+description: Use the jev-browser CLI for natural-language browser actions, form filling, page reading, and E2E interaction steps. Use when jev-browser element is requested or is the chosen browser execution tool. The calling model plans and verifies the workflow; Jev selects targets for individual actions.
 ---
 
 # jev-browser
@@ -9,22 +9,22 @@ Use this CLI as the browser execution tool for the user's task. You plan the wor
 
 ## Start
 
-- Install **`jev-browser-cli`** from npm; invoke **`jev-browser`**. The npm package named `jev-browser` is a different project. Check `jev-browser --version` and `jev-browser --help`.
+- Install **`jev-browser-cli`** from npm; invoke **`jevb`** or **`jev-browser`**. Use `<resource> <action> [object]`, such as `page act` and `session close task-demo`; legacy top-level actions are rejected. The npm package named `jev-browser` is a different project. Check `jevb --version` and `jevb --help`.
 - Node.js 22+ is required. The published binary targets macOS Apple Silicon; other platforms require a source build. The browser executor is bundled.
-- `act` resolves each provider from environment variables first, then saved credentials; TypeSafe wins across providers. For local Key setup and verification, read [sessions-auth.md](references/sessions-auth.md). Do not expose keys or change providers to bypass an error. Commands prompt for login when no model key is configured; help, version and model credential management remain available. Atomic execution makes no model call after login.
+- `page act` resolves each provider from environment variables first, then saved credentials; TypeSafe wins across providers. For local Key setup and verification, read [sessions-auth.md](references/sessions-auth.md). Do not expose keys or change providers to bypass an error. Commands prompt for login when no model key is configured; help, version and model credential management remain available. Atomic execution makes no model call after login.
 
 ## Operate one step at a time
 
 1. Choose a unique session for the task. Replace `task-demo` below and use the same session on every command; serialize its operations.
-2. Use `act --op` when you know the action, and `--value` for an exact known value. Otherwise give `act` one instruction. Independent action, target, input, clear, and submit questions run together; entering text and submitting that field can form one operation. Other multi-step tasks must be split by the caller.
+2. Use `page act --op` when you know the action, and `--value` for an exact known value. Otherwise give `page act` one instruction. Independent action, target, input, clear, and submit questions run together; entering text and submitting that field can form one operation. Other multi-step tasks must be split by the caller.
 3. Inspect `--json` results and the exit code, then verify the expected page state before the next step. A reliable current selector can use an atomic command without a model call.
 4. Close the task's own session when done. For CDP, browser-launch restrictions, or login reuse, read [sessions-auth.md](references/sessions-auth.md).
 
 ```bash
-jev-browser --session task-demo --json open https://example.com
-jev-browser --session task-demo --json act --op get_text 'Example Domain heading'
-jev-browser --session task-demo --json get title
-jev-browser --session task-demo --json close
+jev-browser --session task-demo --json page open https://example.com
+jev-browser --session task-demo --json page act --op get_text 'Example Domain heading'
+jev-browser --session task-demo --json page get title
+jev-browser --session task-demo --json session close
 ```
 
 ## Keep execution boundaries
@@ -43,4 +43,4 @@ jev-browser --session task-demo --json close
 | Session isolation, CDP, browser startup, profiles, saved login state | [sessions-auth.md](references/sessions-auth.md) |
 | Rejection codes, launch/configuration failures, uncertain execution | [troubleshooting.md](references/troubleshooting.md) |
 
-Links are relative to this skill folder. In version 0.1.1 and later, `jev-browser skills path jev-browser` locates the installed folder and `jev-browser skills get jev-browser` reads this entrypoint. `--full` includes all four references; use it only when the complete manual is needed.
+Links are relative to this skill folder. In version 0.1.1 and later, `jev-browser skill path jev-browser` locates the installed folder and `jev-browser skill get jev-browser` reads this entrypoint. `--full` includes all four references; use it only when the complete manual is needed.

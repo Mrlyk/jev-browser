@@ -43,7 +43,7 @@ function fixture(t) {
     XDG_CONFIG_HOME: join(root, 'config'), JEV_BROWSER_RUNTIME_DIR: join(root, 'runtime'),
     MODEL_LOG: join(root, 'models.log'), ACTION_LOG: join(root, 'actions.log') };
   const run = (args, extra = {}) => {
-    const p = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), '--session', 'demo', ...(extra.FAKE_TTY ? [] : ['--json']), 'act', ...args],
+    const p = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), '--session', 'demo', ...(extra.FAKE_TTY ? [] : ['--json']), 'page', 'act', ...args],
       { env: { ...env, ...extra }, input: extra.INPUT, encoding: 'utf8', timeout: 10000 });
     return { ...p, result: extra.FAKE_TTY ? undefined : JSON.parse(p.stdout) };
   };
@@ -58,7 +58,7 @@ test('JSON CLI exposes a concrete plan, confirms once without a model call, and 
   assert.equal(pending.result.data.status, 'needs_confirmation');
   assert.equal(pending.result.data.plan.value, 'jev');
   assert.equal(pending.result.data.plan.submit, true);
-  assert.match(pending.result.confirmation.confirmCommand, /--session demo act --confirm jev-/);
+  assert.match(pending.result.confirmation.confirmCommand, /--session demo page act --confirm jev-/);
   assert.deepEqual(f.actions(), []);
   const confirmed = f.run(['--confirm', pending.result.confirmation.id], { NO_MODEL: '1', TYPESAFE_API_KEY: '' });
   assert.equal(confirmed.status, 0, confirmed.stderr);

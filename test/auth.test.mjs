@@ -197,24 +197,24 @@ test('CLI detects providers, prompts before execution, resumes once and preserve
     assert.equal(plain.stdout, '登录成功。\n');
     assert.equal(plain.stderr, 'API Key（输入隐藏）：\n');
     rmSync(credentialsPath(env));
-    const automatic = run(['--json', 'open', 'https://example.test'], { TEST_KEY: key });
+    const automatic = run(['--json', 'page', 'open', 'https://example.test'], { TEST_KEY: key });
     assert.equal(automatic.status, 0, automatic.stderr);
     assert.deepEqual(JSON.parse(automatic.stdout), { executed: ['open', 'https://example.test'] });
     assert.equal(automatic.stderr, '请先登录。\nAPI Key（输入隐藏）：\n登录成功。\n');
     assert(!`${automatic.stdout}${automatic.stderr}`.includes(key));
     assert.equal(readCredentials(env)[provider], key);
-    const saved = run(['snapshot', '--json']);
+    const saved = run(['page', 'snapshot', '--json']);
     assert.equal(saved.status, 0, saved.stderr);
     assert.equal(saved.stderr, '');
     rmSync(credentialsPath(env));
   }
   for (const options of [{ TEST_REJECT: '1' }, { TEST_CANCEL: '1' }]) {
-    const failed = run(['open', 'https://example.test', '--json'], { TEST_KEY: 'sk-test', ...options });
+    const failed = run(['page', 'open', 'https://example.test', '--json'], { TEST_KEY: 'sk-test', ...options });
     assert.equal(failed.status, 1);
     assert.match(JSON.parse(failed.stdout).error.code, /MODEL_HTTP_401|AUTH_CANCELLED/);
     assert.deepEqual(readCredentials(env), {});
   }
-  for (const args of [['open', 'https://example.test'], ['snapshot'], ['act', 'read title'], ['auth', 'login']]) {
+  for (const args of [['page', 'open', 'https://example.test'], ['page', 'snapshot'], ['page', 'act', 'read title'], ['auth', 'login']]) {
     const failed = run([...args, '--json']);
     assert.equal(failed.status, 1);
     assert.equal(JSON.parse(failed.stdout).error.code, 'NEEDS_INPUT');
@@ -226,7 +226,7 @@ test('CLI detects providers, prompts before execution, resumes once and preserve
     assert.doesNotMatch(result.stdout, /sh-|sk-|自动识别|最小|检查通过|验证/);
     assert.equal(result.stderr, '');
   }
-  const configured = run(['snapshot'], { TYPESAFE_API_KEY: 'env-test' });
+  const configured = run(['page', 'snapshot'], { TYPESAFE_API_KEY: 'env-test' });
   assert.equal(configured.status, 0);
   assert.equal(configured.stderr, '');
 });

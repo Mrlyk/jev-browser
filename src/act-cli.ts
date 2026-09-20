@@ -42,8 +42,8 @@ export async function runAct(options: ActOptions, browser: Browser, context: { s
   if (result.data.status !== 'needs_confirmation' || options.dryRun) { print(result); return; }
   const pending = await savePending(plan, context.session);
   result.confirmation = { ...pending,
-    confirmCommand: `jev-browser --session ${context.session} act --confirm ${pending.id}`,
-    cancelCommand: `jev-browser --session ${context.session} act --cancel ${pending.id}` };
+    confirmCommand: `jev-browser --session ${context.session} page act --confirm ${pending.id}`,
+    cancelCommand: `jev-browser --session ${context.session} page act --cancel ${pending.id}` };
   print(result);
   if (context.json || !process.stdin.isTTY || !process.stdout.isTTY) return;
   const input = createInterface({ input: process.stdin, output: process.stdout });

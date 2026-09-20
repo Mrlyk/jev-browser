@@ -12,7 +12,7 @@ const root = resolve(dirname(cli), '..');
 const folder = join(root, 'skills', 'jev-browser');
 
 function run(args, success = true) {
-  const result = spawnSync(process.execPath, [cli, '--session', `skills-check-${process.pid}`, '--json', 'skills', ...args],
+  const result = spawnSync(process.execPath, [cli, '--session', `skills-check-${process.pid}`, '--json', 'skill', ...args],
     { encoding: 'utf8', maxBuffer: 2_000_000, shell: false });
   assert.ifError(result.error);
   assert.equal(result.status, success ? 0 : 1, result.stderr + result.stdout);

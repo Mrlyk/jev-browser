@@ -75,7 +75,7 @@ try {
   const cliStart = performance.now();
   const cliResult = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [fileURLToPath(new URL('../dist/cli.js', import.meta.url)),
-      '--session', session, '--cdp', cdp, '--json', 'act', '--op', 'fill', '姓名输入框', '--value-stdin'], {
+      '--session', session, '--cdp', cdp, '--json', 'page', 'act', '--op', 'fill', '姓名输入框', '--value-stdin'], {
       env: { ...process.env, TYPESAFE_API_KEY: '', OPENROUTER_API_KEY: config.key }, stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '';

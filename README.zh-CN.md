@@ -14,11 +14,11 @@
 
 需要 Node.js 22 或更新版本。当前预编译包支持 macOS Apple Silicon，其他平台按[开发说明](#4-开发说明)从源码构建。
 
-npm 包名为 `jev-browser-cli`，安装后的运行命令为 `jev-browser`：
+npm 包名为 `jev-browser-cli`，安装后可使用 `jevb` 或 `jev-browser`，两者等价：
 
 ```bash
 npm install -g jev-browser-cli
-jev-browser --version
+jevb --version
 ```
 
 安装包自带浏览器执行器，无需单独安装 agent-browser 或 Rust。首次打开页面时会查找 Chrome，缺少时自动下载。Linux 需要浏览器系统依赖；Linux ARM64 请先安装 Chromium，并通过 `--executable-path` 指定路径。
@@ -36,6 +36,45 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 ```
 
 ## 2. 使用
+
+### CLI 命令
+
+采用 `jevb <资源> <动作> [对象] [选项]`。`--session <name>` 选择浏览器会话；管理会话时直接把名字放在动作后面，例如 `jevb session close demo`。
+
+| 资源 | 动作与用途 |
+| --- | --- |
+| `session` | `list` 列表、`inspect <name>` 详情、`close <name>` 关闭、`close --all` 关闭全部、`current` 默认名称、`id` 生成名称 |
+| `browser` | `connect <端口或URL>` 连接已有浏览器、`inspect` 调试地址、`install` 安装浏览器、`doctor` 诊断、`configure` 配置 |
+| `page` | `open <URL>` 导航、`act <指令>` 自然语言操作、`back/forward/reload` 导航控制、`snapshot` 快照、`read/get` 读取、`wait` 等待、`scroll` 滚动、`screenshot/pdf` 导出 |
+| `element` | `click/dblclick` 点击、`fill/type` 输入、`check/uncheck/select` 选择、`hover/focus` 定位、`get/is/find` 查询、`drag/upload/download/scrollintoview/highlight` 操作 |
+| `tab` / `window` / `frame` | `tab list/create/switch/close` 管理标签页，`window create` 新建窗口，`frame switch/main` 切换框架 |
+| `keyboard` / `mouse` / `touch` | 键盘 `press/down/up/type/inserttext`、鼠标操作、触摸 `tap/swipe` |
+| `cookie` / `storage` / `state` | Cookie `list/set/clear`、网页存储、登录状态 `save/load/list/show/clear/clean/rename` |
+| `auth` | `login/status/logout` 配置模型凭据；网站登录沿用对应子命令 |
+| `network` / `dialog` / `clipboard` | 网络控制、对话框 `status/accept/dismiss`、剪贴板读写 |
+| `console` / `trace` / `profiler` / `record` | 日志 `list/errors/clear`、浏览器追踪、性能分析、视频录制 |
+| `skill` / `profile` / `script` | 技能 `list/get/path`、浏览器档案 `list`、初始化脚本 `remove` |
+| `approval` / `stream` / `device` / `plugin` / `webmcp` / `server` | 执行器 `confirm/deny`、画面流、设备、插件、页面工具，以及 `server start` 启动 MCP |
+
+`page` 还提供 `eval/diff/react/vitals/a11y/pushstate/batch`。通过分组帮助查看完整动作和参数：
+
+```bash
+jevb --help
+jevb page --help
+jevb page open --help
+jevb --session demo --headed page open https://www.baidu.com
+jevb --session demo page act '点击搜索框'
+jevb session inspect demo
+jevb session close demo
+```
+
+旧的顶层 `open/act/click/close` 等入口已移除，调用时会提示对应的资源命令；例如 `close demo` 改为 `session close demo`，`act` 改为 `page act`。自动化脚本和 Agent 指令也需要同步修改。
+
+### 为什么同时提供 act 和 open
+
+`page act` 将自然语言交给 Jev 判断，再调用底层浏览器动作；`page open` 和 `element click` 等确定性命令供已知网址或选择器的脚本直接执行，省去模型判断。两类入口共用执行器，自然语言操作也可以完成导航，无须固定先执行 `page open`。
+
+目前 CLI 的 `page act` 打开网站需要完整 URL，例如 `jevb --session demo page act '打开 https://www.baidu.com'`。插件另外实现了网站名称映射，因此能识别“打开 baidu”；CLI 尚未提供这层映射。
 
 ### 配置模型
 
@@ -64,38 +103,40 @@ export OPENROUTER_API_KEY="你的 OpenRouter Key"
 
 配套 Skill 位于 `skills/jev-browser/`。支持 Skill 的 Agent 可加载该目录；其他模型可先读取 `SKILL.md`，再按其中的说明调用 CLI。
 
-`references/` 下的四份指南分别介绍命令、快照、会话与认证、排错。0.1.1 及更新版本支持 `jev-browser skills get jev-browser` 读取主指南；仅在需要全部参考时加 `--full`。
+`references/` 下的四份指南分别介绍命令、快照、会话与认证、排错。0.1.1 及更新版本支持 `jev-browser skill get jev-browser` 读取主指南；仅在需要全部参考时加 `--full`。
 
 ### 直接用语言操作
 
-打开浏览器后，使用 `act` 描述要执行的动作：
+打开浏览器后，使用 `page act` 描述要执行的动作：
 
 ```bash
-jev-browser --session demo --headed open https://example.com
-jev-browser --session demo act '读取 Example Domain 标题'
-jev-browser --session demo act '点击 Learn more 链接'
-jev-browser --session demo act '返回上一页'
-jev-browser --session demo close
+jev-browser --session demo --headed page open https://example.com
+jev-browser --session demo page act '读取 Example Domain 标题'
+jev-browser --session demo page act '点击 Learn more 链接'
+jev-browser --session demo page act '返回上一页'
+jev-browser session close demo
 ```
 
 `--headed` 显示浏览器窗口；使用相同的 `--session` 名称可连续操作同一个浏览器。
 
-操作自己的业务页面时，先用 `open` 打开地址，再描述页面中的实际控件。以下是独立操作示例：
+用完后执行 `jev-browser session close demo`，成功时显示 `Closed session: demo`。不指定会话时使用 `JEV_BROWSER_SESSION`，未设置则使用 `default`。会话名、`--session` 和 `--all` 不能混用。连接自己的 Chrome 时，关闭会话只断开控制连接。
+
+操作自己的业务页面时，可用 `page open` 打开地址，再描述页面中的实际控件。以下是独立操作示例：
 
 ```bash
-jev-browser --session hotel act '在“酒店关键词”输入框填写“花园”'
-jev-browser --session hotel act '点击搜索酒店按钮'
-jev-browser --session hotel act '点击标准大床房区域的预订按钮'
-jev-browser --session hotel act '勾选同意预订须知'
+jev-browser --session hotel page act '在“酒店关键词”输入框填写“花园”'
+jev-browser --session hotel page act '点击搜索酒店按钮'
+jev-browser --session hotel page act '点击标准大床房区域的预订按钮'
+jev-browser --session hotel page act '勾选同意预订须知'
 ```
 
-一次 `act` 执行一次操作，支持 `act '搜索 jev'` 这样的输入并提交；其他独立多步流程按顺序调用。Jev 并行判断动作、输入框、输入内容、是否清空和是否回车。复杂的填写内容可用引号标明，同名控件加上所在区域。返回 `executed` 表示操作完成，业务是否成功仍需检查页面或接口结果。
+一次 `page act` 执行一次操作，支持 `page act '搜索 jev'` 这样的输入并提交；其他独立多步流程按顺序调用。Jev 并行判断动作、输入框、输入内容、是否清空和是否回车。复杂的填写内容可用引号标明，同名控件加上所在区域。返回 `executed` 表示操作完成，业务是否成功仍需检查页面或接口结果。
 
 不够确定时，CLI 展示页面、目标、输入内容、是否清空和提交，以及需要确认的原因。终端中输入 `y` 执行，其他输入取消。`--json` 或非交互调用返回 `needs_confirmation` 和确认编号，按返回的命令继续：
 
 ```bash
-jev-browser --session demo act --confirm <确认编号>
-jev-browser --session demo act --cancel <确认编号>
+jev-browser --session demo page act --confirm <确认编号>
+jev-browser --session demo page act --cancel <确认编号>
 ```
 
 确认编号限原会话使用，5 分钟内有效，只能处理一次。确认会复核页面和目标，执行已展示的计划。`--dry-run` 始终不执行，也不创建可执行的确认编号。`--value` 和标准输入的内容不会回显；待确认计划临时保存在仅当前用户可读的文件中，确认或取消后删除。
@@ -104,16 +145,16 @@ jev-browser --session demo act --cancel <确认编号>
 
 ```bash
 # 已知动作类型时，只让模型选择目标
-jev-browser --session hotel act --op fill '入住人姓名输入框' --value '张三'
+jev-browser --session hotel page act --op fill '入住人姓名输入框' --value '张三'
 
 # 预览选择，不执行动作；用 JSON 输出结果
-jev-browser --session hotel act --op click '确认预订按钮' --dry-run --json
+jev-browser --session hotel page act --op click '确认预订按钮' --dry-run --json
 
 # 敏感值从标准输入读取
-printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill '密码输入框' --value-stdin
+printf '%s' "$TEST_PASSWORD" | jev-browser --session demo page act --op fill '密码输入框' --value-stdin
 ```
 
-已知选择器时，也可直接使用 `click '#submit'`、`fill '#name' '张三'` 等命令，登录后执行时不调用模型。更多参数见 `jev-browser --help` 和 `jev-browser help`。
+已知选择器时，也可直接使用 `element click '#submit'`、`element fill '#name' '张三'` 等命令，登录后执行时不调用模型。更多参数见 `jev-browser --help` 和 `jev-browser help`。
 
 ## 3. 实现原理简述
 
@@ -123,7 +164,7 @@ printf '%s' "$TEST_PASSWORD" | jev-browser --session demo act --op fill '密码�
 
 相关判断未达到阈值时，工具等待确认；没有有效目标或页面已变化时停止执行。输入与提交之间也会复核目标，已部分执行或结果未知时不自动重放。
 
-例如 `act '搜索 jev'`，在一次请求中并行判断各个操作要素，只使用相关分支的结果。任何相关判断不够确定都会进入确认流程。指定 `--op fill/type` 时保留明确的清空/追加行为，不自动回车。
+例如 `page act '搜索 jev'`，在一次请求中并行判断各个操作要素，只使用相关分支的结果。任何相关判断不够确定都会进入确认流程。指定 `--op fill/type` 时保留明确的清空/追加行为，不自动回车。
 
 ## 4. 开发说明
 

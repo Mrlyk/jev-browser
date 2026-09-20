@@ -2096,6 +2096,14 @@ fn main() {
             let success = resp.success;
             // Extract action for context-specific output handling
             let action = cmd.get("action").and_then(|v| v.as_str());
+            // Add routing context client-side, including replies from older daemons.
+            if success && action == Some("close") {
+                if let Some(data) = resp.data.as_mut().and_then(|value| value.as_object_mut()) {
+                    if data.get("closed").and_then(|value| value.as_bool()) == Some(true) {
+                        data.insert("session".to_string(), json!(flags.session));
+                    }
+                }
+            }
             print_response_with_opts(&resp, action, &output_opts);
             if !success {
                 exit(1);

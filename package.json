@@ -5,7 +5,8 @@
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
-    "jev-browser": "dist/cli.js"
+    "jev-browser": "dist/cli.js",
+    "jevb": "dist/cli.js"
   },
   "engines": {
     "node": ">=22.0.0"

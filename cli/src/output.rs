@@ -1060,6 +1060,12 @@ fn print_primary_response(resp: &Response, action: Option<&str>, opts: &OutputOp
         }
         // Closed (browser or tab)
         if data.get("closed").is_some() {
+            if action == Some("close") {
+                if let Some(session) = data.get("session").and_then(|v| v.as_str()) {
+                    println!("Closed session: {}", session);
+                    return;
+                }
+            }
             let label = match action {
                 Some("tab_close") => {
                     if let Some(closed_id) = data.get("tabId").and_then(|v| v.as_str()) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Browser } from './browser.js';
 import { parseArgs } from './arguments.js';
+import { resourceOverview } from './command-tree.js';
 import { runAct } from './act-cli.js';
 import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
@@ -8,28 +9,44 @@ import { ensureLogin, handleAuth } from './auth.js';
 
 const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
 
-用法：jev-browser [全局参数] <命令> [参数]
+用法：jev-browser [全局参数] <资源> <动作> [对象] [选项]
 
-  open <url>                 打开页面；缺少本地 Chrome 时自动准备
-  snapshot --json            读取结构化页面快照
-  click @e1 / fill @e2 值     确定性命令，不调用模型
-  act "点击入住信息的确认"     选择并执行一次操作
-  act "搜索 jev"             并行判断输入框、内容、清空和提交
-  act --op fill "姓名" --value "张三"
-  act --op fill "密码" --value-stdin
-  act "点击确认" --dry-run --json
-  act --confirm <编号>       确认执行已展示的计划
-  act --cancel <编号>        取消待确认计划
+  page open <url>            打开页面；缺少本地 Chrome 时自动准备
+  page snapshot --json       读取结构化页面快照
+  element click @e1          确定性命令，不调用模型
+  page act "点击入住信息的确认" 选择并执行一次操作
+  page act "搜索 jev"        并行判断输入框、内容、清空和提交
+  page act --op fill "姓名" --value "张三"
+  page act --op fill "密码" --value-stdin
+  page act "点击确认" --dry-run --json
+  page act --confirm <编号>  确认执行已展示的计划
+  page act --cancel <编号>   取消待确认计划
+  session close [会话名]    关闭指定会话，例如 session close demo
+  session close --all       关闭全部会话
+  session list              列出运行中的会话
   auth login                登录
   auth login --with-token    从标准输入登录
   auth status / auth logout <提供方>             查看来源 / 删除本地 Key
 
-act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
+资源命令：
+${resourceOverview()}
+
+page act：--op、--value、--value-stdin、--scope <CSS>、--dry-run
      --min-probability <0..1>（默认 0.85）、--min-margin <0..1>（默认 0.20）
 全局：--session <name>、--headed、--cdp <port|url>、--json
-原子命令详见：jev-browser help
+查看参数：jev-browser <资源> <动作> --help
+命令别名：jevb 与 jev-browser 等价；仅支持资源命令。
 
 首次使用时会提示登录。
+`;
+
+const closeHelp = `用法：jev-browser session close [会话名] | jev-browser session close --all
+
+  jev-browser session close demo     关闭 demo 会话
+  jev-browser session close --all    关闭全部会话
+
+省略会话名时使用 JEV_BROWSER_SESSION，未设置则使用 default。
+会话名、--session 和 --all 不能混用。连接自己的 Chrome 时只断开控制连接。
 `;
 
 async function stdinValue(): Promise<string> {
@@ -46,19 +63,33 @@ async function stdinValue(): Promise<string> {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  if (!args.length || args[0] === '--help' || args[0] === '-h' || (args[0] === 'act' && args[1] === '--help')) {
+  if (!args.length || args[0] === '--help' || args[0] === '-h') {
     process.stdout.write(help); return;
   }
   if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.3\n'); return; }
   const parsed = parseArgs(args);
+  if (parsed.help) { process.stdout.write(parsed.help); return; }
+  if (parsed.name === 'close' && parsed.rest.some(arg => ['--help', '-h'].includes(arg))) {
+    process.stdout.write(closeHelp); return;
+  }
   if (parsed.name === 'auth' && await handleAuth(parsed.rest, parsed.json)) return;
   if (parsed.name === 'help' && parsed.rest[0] === 'auth') { await handleAuth(['--help'], parsed.json); return; }
   const showingHelp = !parsed.name || parsed.name === 'help' || parsed.rest.some(arg => ['--help', '-h'].includes(arg));
-  if (parsed.name === 'help' && !parsed.rest.length) process.stdout.write(help + '\n');
+  if ((parsed.name === 'help' && !parsed.rest.length) || (parsed.name === 'act' && showingHelp)) {
+    process.stdout.write(help); return;
+  }
   if (!showingHelp && !parsed.options.confirm && !parsed.options.cancel) await ensureLogin();
   if (parsed.name === 'upgrade') throw new JevError('UPGRADE_VIA_NPM', '请通过 npm install -g jev-browser-cli 更新完整安装包。');
   if (parsed.name === 'dashboard') throw new JevError('UNSUPPORTED_COMMAND', '首版尚未打包上游 Dashboard。');
   const browser = new Browser(parsed.globals);
+  if (showingHelp) {
+    const result = await browser.run([parsed.name === 'help' || !parsed.name ? '--help' : parsed.name, ...parsed.rest]);
+    const text = parsed.commandPath ? result.stdout.replaceAll(`agent-browser ${parsed.name}`, `jev-browser ${parsed.commandPath}`) : result.stdout;
+    process.stdout.write(text.replaceAll('agent-browser', 'jev-browser'));
+    process.stderr.write(result.stderr);
+    process.exitCode = result.code;
+    return;
+  }
   await withSession(parsed.session, async () => {
     if (parsed.name === 'act') {
       if (parsed.options.valueStdin) parsed.options.value = await stdinValue();

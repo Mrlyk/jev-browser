@@ -5,12 +5,12 @@ Use when inspecting structure, disambiguating similar controls, or recovering af
 ## Choose the observation
 
 ```bash
-jev-browser --session task-demo --json snapshot
-jev-browser --session task-demo --json snapshot -i
-jev-browser --session task-demo --json snapshot -s '#guest-section'
+jev-browser --session task-demo --json page snapshot
+jev-browser --session task-demo --json page snapshot -i
+jev-browser --session task-demo --json page snapshot -s '#guest-section'
 ```
 
-The full snapshot preserves region and ancestor context. `-i` is useful for a small interactive-control view; it may omit context needed to distinguish identical labels. `-s` scopes observation to a verified CSS selector. These options are for explicit observation; `act` builds and validates its own snapshot.
+The full snapshot preserves region and ancestor context. `-i` is useful for a small interactive-control view; it may omit context needed to distinguish identical labels. `-s` scopes observation to a verified CSS selector. These options are for explicit observation; `page act` builds and validates its own snapshot.
 
 A simplified snapshot excerpt:
 
@@ -28,7 +28,7 @@ The atomic target is `@e3`; a useful semantic description is “Confirm button i
 
 A ref is meaningful within the observed browser session, page, and frame. It is not a permanent selector or business identifier. Refs for surviving DOM elements may persist across snapshots, while navigation, replaced documents/elements, and virtual accessibility nodes can invalidate them.
 
-Before using a stored ref after navigation, tab/frame changes, or a rerender, observe again. Do not fabricate a replacement ref by incrementing its number. `act` rechecks page identity, ref, DOM identity, name, context, and applicable state before dispatch; a stale result stops rather than selecting a similar-looking target automatically.
+Before using a stored ref after navigation, tab/frame changes, or a rerender, observe again. Do not fabricate a replacement ref by incrementing its number. `page act` rechecks page identity, ref, DOM identity, name, context, and applicable state before dispatch; a stale result stops rather than selecting a similar-looking target automatically.
 
 ## Keep target coverage explicit
 
@@ -41,9 +41,9 @@ Before using a stored ref after navigation, tab/frame changes, or a rerender, ob
 For example, after confirming `#guest-section` from the actual page:
 
 ```bash
-jev-browser --session task-demo --json act --op click 'Confirm button' --scope '#guest-section' --dry-run
+jev-browser --session task-demo --json page act --op click 'Confirm button' --scope '#guest-section' --dry-run
 ```
 
-`resolved` means the preview identified a target. It is not an execution token; the next real `act` observes and checks the page again.
+`resolved` means the preview identified a target. It is not an execution token; the next real `page act` observes and checks the page again.
 
 For assertions, prefer independent stable selectors or business identifiers established by the test contract. Rechecking only the ref chosen by the same model can miss selection of the wrong field.
