@@ -1,11 +1,13 @@
 import { JevError } from '../errors.js';
 import { interactiveHelp, parseInteractive } from './options.js';
+import { ensureInteractiveLogin } from './login.js';
 
 export async function startInteractive(args: string[]) {
   if (args.includes('--help') || args.includes('-h')) { process.stdout.write(interactiveHelp); return; }
   if (!process.stdin.isTTY || !process.stdout.isTTY || process.env.TERM === 'dumb')
     throw new JevError('TTY_REQUIRED', 'Interactive mode requires a terminal for input and output. Use commands such as jevb page in scripts.');
   const options = parseInteractive(args);
+  await ensureInteractiveLogin(options.provider);
   const [{ render }, { createElement }, { App }, { Controller }] = await Promise.all([
     import('ink'), import('react'), import('./App.js'), import('./controller.js'),
   ]);

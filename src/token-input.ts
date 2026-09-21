@@ -2,7 +2,7 @@ import { emitKeypressEvents, type Key } from 'node:readline';
 import { JevError } from './errors.js';
 import { validKey } from './credentials.js';
 
-export async function readToken(fromStdin: boolean): Promise<string> {
+export async function readToken(fromStdin: boolean, prompt = 'API Key（输入隐藏）：'): Promise<string> {
   let value = '';
   if (fromStdin) {
     if (process.stdin.isTTY) throw new JevError('NEEDS_INPUT', '--with-token requires an API key on stdin.');
@@ -13,19 +13,19 @@ export async function readToken(fromStdin: boolean): Promise<string> {
   } else {
     if (!process.stdin.isTTY || !process.stderr.isTTY)
       throw new JevError('NEEDS_INPUT', 'Interactive login requires a terminal. For automation, use jevb auth login --with-token to read the API key from stdin.');
-    value = await hiddenToken();
+    value = await hiddenToken(prompt);
   }
   value = value.trim();
   if (!validKey(value)) throw new JevError('INVALID_API_KEY', 'API key is empty or invalid.');
   return value;
 }
 
-function hiddenToken(): Promise<string> {
+function hiddenToken(prompt: string): Promise<string> {
   const input = process.stdin;
   const wasRaw = input.isRaw;
   emitKeypressEvents(input);
   input.setRawMode(true);
-  process.stderr.write('API Key（输入隐藏）：');
+  process.stderr.write(prompt);
   return new Promise((resolve, reject) => {
     let value = '';
     const finish = (error?: Error) => {

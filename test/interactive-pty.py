@@ -25,8 +25,13 @@ with tempfile.TemporaryDirectory(prefix='jev-tui-pty-') as directory:
 import { Browser } from %s;
 import { appendFileSync } from 'node:fs';
 import { Controller } from %s;
+globalThis.fetch = async (_url, init) => init.headers.Authorization === 'Bearer invalid-pty-key'
+  ? new Response('', { status: 401 })
+  : Response.json({ model: 'fixture', answers: { check: { type: 'choice', choice: 'yes', confidence: 1, probabilities: { yes: 1, no: 0 } } } });
 const originalSubmit = Controller.prototype.submit;
 Controller.prototype.submit = async function(value) {
+  // Input rendering only; never send fixture credentials to a real provider.
+  if (value === '中文输入') { this.log(value, 'user'); return; }
   if (value === '测试确认') {
     this.state.pending = { plan: { operation: 'click', target: { name: '测试按钮' } }, choices: [] };
     this.emit('change'); return;
@@ -86,10 +91,22 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
         send('\r')
 
     try:
+        wait_for('API key (hidden):')
+        assert not calls.exists(), 'Browser started before login'
+        enter('invalid-pty-key')
+        wait_for('Try again, or press Ctrl+C')
+        assert not calls.exists(), 'Browser started after rejected key'
+        enter('official-pty-key')
+        wait_for('Signed in.')
+        saved = work / 'jev-browser' / 'credentials.json'
+        assert json.loads(saved.read_text()) == {'typesafe': 'official-pty-key'}
+        assert saved.stat().st_mode & 0o777 == 0o600
+        assert 'invalid-pty-key' not in rendered() and 'official-pty-key' not in rendered()
+        started = time.monotonic()
         wait_for('Describe a browser action')
         first_screen = round((time.monotonic() - started) * 1000)
         wait_for('t7 · 中文测试页')
-        wait_for('Not configured')
+        wait_for('TypeSafe / jev-latest')
         assert '[后退]' not in rendered()
         assert 'Welcome to Jev' in rendered()
         # Chinese + combining character + grapheme deletion.
@@ -154,8 +171,33 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
         assert termios.tcgetattr(slave) == original, 'raw mode was not restored'
         assert b'\x1b[?2004l' in output, 'bracketed paste mode was not restored'
         assert b'\x1b[?25h' in output, 'cursor was not restored'
+        # The saved key skips login on the next real terminal launch.
+        output = bytearray()
+        process = subprocess.Popen(['node', '--import', str(hook), 'dist/cli.js'], cwd=root, env=env,
+                                   stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
+        wait_for('Describe a browser action')
+        assert 'API key (hidden)' not in rendered()
+        enter('/exit')
+        process.wait(timeout=8)
+        read_for(0.2)
+        assert process.returncode == 0
+        assert termios.tcgetattr(slave) == original
+        # Cancelling onboarding restores the terminal without connecting a browser.
+        before_calls = calls.read_text()
+        output = bytearray()
+        cancel_env = dict(env, XDG_CONFIG_HOME=str(work / 'cancel'))
+        process = subprocess.Popen(['node', '--import', str(hook), 'dist/cli.js'], cwd=root, env=cancel_env,
+                                   stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
+        wait_for('API key (hidden):')
+        send('\x03')
+        process.wait(timeout=8)
+        read_for(0.2)
+        assert process.returncode == 1
+        assert termios.tcgetattr(slave) == original
+        assert calls.read_text() == before_calls
+        assert not (work / 'cancel' / 'jev-browser' / 'credentials.json').exists()
         print(json.dumps({'passed': True, 'firstScreenMs': first_screen,
-          'checks': ['bare entry', 'metadata', 'no key', 'Chinese and grapheme deletion', 'multiline paste',
+          'checks': ['bare entry', 'metadata', 'startup login', 'saved login skip', 'login cancellation', 'rejected key retry', 'hidden key', 'credential storage', 'Chinese and grapheme deletion', 'multiline paste',
                      'completion', 'history', 'slash menu', 'confirmation selector', 'connection selector', 'tab selector', 'resize', 'terminal restoration']}, ensure_ascii=False))
     finally:
         if process.poll() is None:

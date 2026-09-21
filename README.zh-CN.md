@@ -28,7 +28,7 @@ https://github.com/Mrlyk/jev-browser/blob/master/skills/jev-browser/SKILL.md
 
 ## 2. 配置模型
 
-准备 TypeSafe 或 OpenRouter API Key，登录一次：
+直接运行 `jevb`。未配置 Key 时会进入登录流程，输入 TypeSafe 或 OpenRouter API Key 后自动进入交互终端；输入内容不会回显。也可单独登录：
 
 ```bash
 jevb auth login

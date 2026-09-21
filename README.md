@@ -28,7 +28,7 @@ and use it for browser tasks in this project.
 
 ## 2. Configure a model
 
-Get a TypeSafe or OpenRouter API key, then sign in once:
+Start `jevb`. If no API key is configured, it prompts you to sign in with a TypeSafe or OpenRouter key. Input is hidden; after login, the terminal opens automatically. You can also sign in separately:
 
 ```bash
 jevb auth login
