@@ -51,7 +51,9 @@ export TYPESAFE_API_KEY="你的 API Key"
 jevb
 ```
 
-连续输入“打开 https://example.com”“点击 Learn more 链接”等指令。默认连接已有 Chrome；在 `chrome://inspect/#remote-debugging` 开启远程调试，并允许连接。输入框下方显示页面标题、Tab、模型提供方和连接模式。
+![Jev 交互终端](docs/images/interactive-terminal.png)
+
+默认连接已有 Chrome，在 `chrome://inspect/#remote-debugging` 开启远程调试，并允许连接。
 
 ```bash
 jevb tui --headed                     # 新建有头浏览器
@@ -74,15 +76,10 @@ jevb tui --model-provider openrouter  # 指定模型提供方
 | `/clear`、`/reset` | 清理显示、重置操作上下文 |
 | `/help`、`/exit` | 查看命令、退出 |
 
-输入 `/` 打开命令菜单，↑/↓ 选择，Enter 执行，Tab 补全。无菜单时，↑/↓ 浏览历史，←/→ 移动光标。Esc 取消；Ctrl+C 取消执行或清空输入，输入为空时退出。粘贴多行文字后需按 Enter 发送。
-
-需要确认时，用 ↑/↓ 选择目标或“执行 / 取消”，Enter 确定。页面改变会使旧确认失效。动作已经发送后，取消无法撤销它，请检查页面结果再继续。
-
 `/connect auto` 连接已有 Chrome，`/connect headed`、`/connect headless` 新建浏览器，`/connect cdp 9222` 连接指定地址。切换连接保留原浏览器。
 
 操作标签页绑定到会话，通过 `/tab` 切换。`/exit` 保留浏览器，按退出时打印的命令重新连接；`/exit --close` 同时关闭本次交互创建的浏览器。
 
-未配置 Key 时仍可使用快捷命令。输入历史仅保存在内存中。交互模式需要终端；已有 CLI 命令和管道调用方式保持不变。
 
 ### Agent 与脚本命令
 
@@ -154,25 +151,6 @@ jevb page act mychrome "搜索 jev" --auto-connect --pin-tab
 将 `t2` 替换为列表中的目标标签页 ID，后续保持同一会话名。以上参数也可通过 `jevb help`、`jevb help browser connect`、`jevb help page act` 或 `jevb help tab list` 查看。
 
 点击当前绑定页的链接打开新标签页时，会话自动跟随新页，后续命令继续操作该页。直接用 `tab create` 创建标签页也会切换绑定。手动切到其他已有标签页时，使用 `tab switch` 明确选择。绑定页关闭后，`jevb page act demo "打开百度"` 这类打开网页操作会新建标签页；点击、填写仍需重新选择页面。`session clear` 会清除全部会话的标签页绑定，包括已退出的会话。
-
-### 预览与确认
-
-先看计划，不执行动作：
-
-```bash
-jevb page act demo "搜索 jev" --dry-run --json
-```
-
-输出会展示会话名、标签页 ID、页面标题、网址及操作目标；执行后发生跳转时还会显示当前页面。JSON 的 `data.pageContext` 返回当前页面信息，`data.plan` 保留操作前的页面。模型不够确定时，终端输入 `y` 执行，其他输入取消；使用 `--json` 时，`needs_confirmation` 表示尚未执行。根据返回的确认编号，选择执行或取消：
-
-```bash
-jevb page act demo --confirm <确认编号>
-jevb page act demo --cancel <确认编号>
-```
-
-确认编号限原会话使用，5 分钟内有效，只能处理一次。确认前会复核页面和目标；`--dry-run` 不生成可执行的确认编号。
-
-`executed` 表示浏览器操作已完成，业务结果仍需检查页面。出现 `EXECUTION_UNKNOWN` 时先查看实际状态，避免重复提交；其他错误见[排错指南](skills/jev-browser/references/troubleshooting.md)。
 
 ### 指定动作和输入内容
 

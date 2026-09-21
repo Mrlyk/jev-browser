@@ -53,15 +53,17 @@ For non-interactive login, logout, and credential storage, see the [authenticati
 jevb
 ```
 
-Type instructions continuously, such as `Open https://example.com` or `Click Learn more`. By default, jevb connects to your existing Chrome. Enable remote debugging at `chrome://inspect/#remote-debugging` and allow the connection. The footer below the editor shows the page title, tab, model provider, and connection mode.
+![Jev interactive terminal](docs/images/interactive-terminal.png)
+
+By default, jevb connects to your existing Chrome. Enable remote debugging at `chrome://inspect/#remote-debugging` and allow the connection.
 
 ```bash
-jevb tui --headed
-jevb tui --headless
-jevb tui --session demo
-jevb tui --cdp 9222
-jevb tui --auto-connect
-jevb tui --model-provider openrouter
+jevb tui --headed                     # Launch a headed browser
+jevb tui --headless                   # Launch a headless browser
+jevb tui --session demo               # Reuse an existing session
+jevb tui --cdp 9222                   # Connect to a specific browser
+jevb tui --auto-connect               # Connect to local Chrome
+jevb tui --model-provider openrouter  # Choose a model provider
 ```
 
 | Command | Action |
@@ -76,15 +78,9 @@ jevb tui --model-provider openrouter
 | `/clear`, `/reset` | Clear the display or reset operation context |
 | `/help`, `/exit` | Show commands or exit |
 
-Type `/` to browse commands. Use ↑/↓ to select, Enter to run, and Tab to complete. Outside menus, ↑/↓ browse history and ←/→ move the cursor. Esc cancels. Ctrl+C cancels work, clears input, or exits when the input is empty. Multiline paste waits for Enter.
-
-When prompted, use ↑/↓ and Enter to select a target or choose whether to execute or cancel. Changing pages invalidates pending confirmations. Cancelling an action already sent to the browser cannot undo it; check the page before retrying.
-
 `/connect auto` attaches to Chrome; `/connect headed` or `/connect headless` launches a new browser; `/connect cdp 9222` uses a specific address. The previous browser stays open.
 
 The selected tab stays bound to the session. Use `/tab` to change it. `/exit` keeps the browser running; reconnect with the printed session command. `/exit --close` also closes a browser created by this interaction.
-
-No API key is needed for slash commands. Input history stays in memory. Interactive mode requires a terminal; existing CLI commands and piped calls retain their behavior.
 
 ### Agent and script commands
 
@@ -102,6 +98,10 @@ Browser operations use `jevb <resource> <action> <session> [object] [options]`. 
 `page act` accepts natural language. When you know the URL, selector, or key, use commands such as `page open`, `element click`, or `keyboard press` without a model decision.
 
 Each `page act` performs one operation; a search may include typing and pressing Enter. Split other multi-step tasks into separate calls. Natural-language navigation requires a full URL.
+
+Pages with many candidates are evaluated in batches of up to 253 targets, plus no-match and ambiguity options. The top two from each batch enter a final comparison; the highest-probability target wins, with confirmation when uncertain.
+
+Requests also split by input size. If a single target or shared context is too large, narrow the scope with `--scope`.
 
 ### Common commands
 
@@ -139,7 +139,7 @@ For refs and session reuse, read the [snapshot guide](skills/jev-browser/referen
 | --- | --- | --- |
 | `--auto-connect` | Connect to local Chrome with remote debugging enabled, reusing tabs and login state | `jevb tab list mychrome --auto-connect` |
 | `--cdp <port\|url>` | Connect to a specific debug port or CDP address; cannot be combined with `--auto-connect` | `jevb page snapshot mychrome --cdp 9222` |
-| `--pin-tab` | Keep the session on its selected tab; fail if that tab closes instead of switching to another | `jevb page snapshot mychrome --auto-connect --pin-tab` |
+| `--pin-tab` | Bind the session to the selected tab and follow tabs it opens; other pages cannot take over the binding | `jevb page snapshot mychrome --auto-connect --pin-tab` |
 | `--no-pin-tab` | Stop pinning the selected tab | `jevb page snapshot mychrome --auto-connect --no-pin-tab` |
 | `--headed` | Show the window when launching a local browser; unnecessary when attaching to an existing browser | `jevb page open demo https://example.com --headed` |
 | `--json` | Output operation results as JSON for scripts | `jevb tab list mychrome --auto-connect --json` |
@@ -155,30 +155,9 @@ jevb page act mychrome "Search for jev" --auto-connect --pin-tab
 
 Replace `t2` with the target tab ID from the list and keep using the same session name. These options also appear in `jevb help`, `jevb help browser connect`, `jevb help page act`, and `jevb help tab list`.
 
+When a link in the bound page opens a new tab, the session follows it. `tab create` also switches the binding to the new tab. Use `tab switch` to select another existing tab.
+
 If a bound tab has closed, a `page act` instruction to open a website creates a new tab. Clicking or filling still requires selecting a page. `session clear` removes all saved tab bindings, including those left by sessions that have already exited.
-
-### Preview and confirm
-
-Inspect a plan without executing it:
-
-```bash
-jevb page act demo "Search for jev" --dry-run --json
-```
-
-When uncertain, the CLI shows the page, target, value, and submission behavior. Enter `y` to execute or anything else to cancel.
-
-With `--json`, `needs_confirmation` means nothing has executed. Use the returned ID to confirm or cancel:
-
-```bash
-jevb page act demo --confirm <confirmation-id>
-jevb page act demo --cancel <confirmation-id>
-```
-
-IDs work only in the original session, expire after five minutes, and can be used once. Confirmation rechecks the page and target. `--dry-run` does not create an executable confirmation ID.
-
-`executed` means the browser operation completed; check the page for the business result. After `EXECUTION_UNKNOWN`, inspect the state before retrying.
-
-For other errors, see [troubleshooting](skills/jev-browser/references/troubleshooting.md).
 
 ### Specify the action and value
 
