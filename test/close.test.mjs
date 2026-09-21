@@ -109,13 +109,17 @@ nativeTest('session clear closes every daemon and succeeds again on an empty run
     assert.equal(started.status, 0, started.stderr);
     writeFileSync(join(directory, `${session}.target`), JSON.stringify({ targetId: 'closed-tab', url: '', pinned: true }));
   }
+  writeFileSync(join(directory, 'stopped.target'), '{}');
+  const listed = run(['session', 'list', '--json'], env);
+  assert.equal(listed.status, 0, listed.stderr);
+  assert.deepEqual(JSON.parse(listed.stdout).data.sessions.sort(), ['first', 'second']);
   const cleared = run(['session', 'clear', '--json'], env);
   assert.equal(cleared.status, 0, cleared.stderr);
   const response = JSON.parse(cleared.stdout);
   assert.equal(response.success, true);
   assert.equal(response.data.closed, 2);
   assert.deepEqual(response.data.sessions.sort(), ['first', 'second']);
-  for (const session of ['first', 'second']) assert.equal(existsSync(join(directory, `${session}.target`)), false);
+  for (const session of ['first', 'second', 'stopped']) assert.equal(existsSync(join(directory, `${session}.target`)), false);
   const remaining = run(['session', 'list', '--json'], env);
   assert.equal(remaining.status, 0, remaining.stderr);
   assert.deepEqual(JSON.parse(remaining.stdout).data.sessions, []);
@@ -139,7 +143,12 @@ nativeTest('session clear removes saved bindings even when session list is empty
   assert.ok(existsSync(join(directory, 'demo.target')));
   const cleared = run(['session', 'clear', '--json'], env);
   assert.equal(cleared.status, 0, cleared.stderr);
-  assert.deepEqual(JSON.parse(cleared.stdout).data.sessions, ['demo']);
+  assert.deepEqual(JSON.parse(cleared.stdout), { success: true, data: { closed: 0, sessions: [] } });
+  assert.equal(existsSync(join(directory, 'demo.target')), false);
+  writeFileSync(join(directory, 'demo.target'), binding);
+  const text = run(['session', 'clear'], env);
+  assert.equal(text.status, 0, text.stderr);
+  assert.equal(text.stdout, 'No active sessions\n');
   assert.equal(existsSync(join(directory, 'demo.target')), false);
   assert.ok(existsSync(join(unrelated, 'keep.target')));
 });

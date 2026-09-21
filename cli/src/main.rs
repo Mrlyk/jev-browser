@@ -1304,21 +1304,14 @@ fn run_close_all(flags: &Flags) {
     }
 
     let excluded: Vec<String> = failed.iter().map(|(session, _)| session.clone()).collect();
-    match native::tab_binding::clear_saved_bindings(&excluded) {
-        Ok(saved) => {
-            for session in saved {
-                if !closed.contains(&session) {
-                    closed.push(session);
-                }
-            }
-        }
-        Err(error) => failed.push(("saved tab bindings".to_string(), error)),
+    if let Err(error) = native::tab_binding::clear_saved_bindings(&excluded) {
+        failed.push(("saved tab bindings".to_string(), error));
     }
     if closed.is_empty() && failed.is_empty() {
         if flags.json {
             print_json_value(json!({"success": true, "data": {"closed": 0, "sessions": []}}));
         } else {
-            println!("No active sessions or saved tab bindings");
+            println!("No active sessions");
         }
         return;
     }
