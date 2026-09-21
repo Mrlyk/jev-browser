@@ -10,8 +10,8 @@ for (const mode of ['headed', 'headless']) {
   const controller = new Controller(options);
   try {
     await controller.start();
-    assert.match(controller.state.connection, /本地托管/, controller.state.transcript.map(x => x.text).join('\n'));
-    assert.equal(controller.state.mode, mode === 'headed' ? '有头' : '无头');
+    assert.match(controller.state.connection, /Managed/, controller.state.transcript.map(x => x.text).join('\n'));
+    assert.equal(controller.state.mode, mode === 'headed' ? 'Headed' : 'Headless');
     await controller.shutdown(true);
     const info = await new Browser(['--session', session]).request(['session', 'info']);
     assert.equal(info.active, false);

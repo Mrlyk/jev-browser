@@ -20,7 +20,7 @@ function check(condition, message) { assert.ok(condition, message + '\n' + JSON.
 try {
   await controller.start();
   check(controller.state.connection.includes('CDP'), 'real CDP connection');
-  check(controller.state.mode === '模式未知', 'attached display mode is not guessed');
+  check(controller.state.mode === 'Unknown', 'attached display mode is not guessed');
   await controller.submit(`/open http://127.0.0.1:${server.address().port}`);
   for (let i = 0; i < 20 && !controller.state.tabs.some(t => t.active && t.title === 'Jev 浏览器测试页面'); i++) {
     await new Promise(resolve => setTimeout(resolve, 100)); await controller.poll();

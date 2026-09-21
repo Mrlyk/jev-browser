@@ -31,9 +31,9 @@ Controller.prototype.submit = async function(value) {
     this.state.pending = { plan: { operation: 'click', target: { name: '测试按钮' } }, choices: [] };
     this.emit('change'); return;
   }
-  if (this.state.pending && ['确认', '取消'].includes(value)) {
+  if (this.state.pending && ['yes', 'no'].includes(value)) {
     this.state.pending = undefined;
-    this.log(value === '确认' ? '选择执行完成' : '选择取消完成'); return;
+    this.log(value === 'yes' ? '选择执行完成' : '选择取消完成'); return;
   }
   return originalSubmit.call(this, value);
 };
@@ -86,10 +86,10 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
         send('\r')
 
     try:
-        wait_for('输入一句话操作浏览器')
+        wait_for('Describe a browser action')
         first_screen = round((time.monotonic() - started) * 1000)
         wait_for('t7 · 中文测试页')
-        wait_for('未配置')
+        wait_for('Not configured')
         assert '[后退]' not in rendered()
         assert 'Welcome to Jev' in rendered()
         # Chinese + combining character + grapheme deletion.
@@ -116,25 +116,25 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
         assert len(re.findall(r'(?m)^ /status +\r?$', rendered())) >= 2
         # Slash menu replaces the toolbar. Arrow selection invokes /go.
         send('/')
-        wait_for('命令 · ↑↓ 选择')
+        wait_for('Commands · ↑↓ Select')
         send('\x1b[B')
         send('\r')
-        wait_for('已执行 /go')
+        wait_for('Executed /go')
         enter('/back')
-        wait_for('已执行 /back')
+        wait_for('Executed /back')
         enter('/tab')
         wait_for('中文测试页 · https://example.test')
         send('\r')
-        wait_for('已执行 /tab')
+        wait_for('Executed /tab')
         enter('/connect')
-        wait_for('连接已有 Chrome（默认）')
+        wait_for('Connect to existing Chrome (default)')
         send('\x1b[B')
         send('\r')
         wait_for('/connect cdp')
         send('\x15')
         # Confirmation is answered entirely with arrows and Enter.
         enter('测试确认')
-        wait_for('执行此次操作')
+        wait_for('Execute this action')
         send('\x1b[B')
         send('\r')
         wait_for('选择取消完成')

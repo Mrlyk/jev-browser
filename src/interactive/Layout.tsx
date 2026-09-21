@@ -17,15 +17,15 @@ export function Welcome({ width }: { width: number }) {
       </Box>
       <Box flexDirection="column" flexGrow={1} borderStyle={wide ? 'single' : undefined}
         borderTop={false} borderBottom={false} borderRight={false} borderColor="gray" paddingLeft={wide ? 2 : 0} paddingY={1}>
-        <Text color="cyan">开始使用</Text>
-        <Text>/          查看所有命令</Text>
-        <Text>/tab       切换操作标签页</Text>
-        <Text>/connect   切换浏览器连接</Text>
-        <Text>/exit      退出</Text>
+        <Text color="cyan">Getting started</Text>
+        <Text>/          Browse commands</Text>
+        <Text>/tab       Switch tabs</Text>
+        <Text>/connect   Change connection</Text>
+        <Text>/exit      Exit</Text>
         <Box marginTop={1} flexDirection="column">
-          <Text color="cyan">浏览器</Text>
-          <Text dimColor>默认连接已有 Chrome</Text>
-          <Text dimColor>用一句话描述你要执行的操作</Text>
+          <Text color="cyan">Browser</Text>
+          <Text dimColor>Connects to existing Chrome by default</Text>
+          <Text dimColor>Describe a browser action in your own words</Text>
         </Box>
       </Box>
     </Box>
@@ -35,24 +35,24 @@ export function Welcome({ width }: { width: number }) {
 export function Menu({ items, selected, title }: { items: Array<readonly [string, string]>; selected: number; title: string }) {
   const start = Math.max(0, selected - 4);
   return <Box flexDirection="column" paddingX={1}>
-    <Text dimColor>{title} · ↑↓ 选择 · Enter 确定 · Esc 关闭</Text>
+    <Text dimColor>{title} · ↑↓ Select · Enter Confirm · Esc Close</Text>
     {items.length ? items.slice(start, start + 6).map(([name, label], index) => <Text key={name} wrap="truncate-end"
       color={start + index === selected ? 'magentaBright' : undefined} bold={start + index === selected}>
       {start + index === selected ? '› ' : '  '}{clean(name)}  <Text dimColor>{clean(label)}</Text>
-    </Text>) : <Text dimColor>暂无标签页，使用 /new 打开页面。</Text>}
+    </Text>) : <Text dimColor>No tabs. Use /new to open a page.</Text>}
   </Box>;
 }
 
 export function Footer({ state, session, width }: { state: import('./controller.js').ViewState; session: string; width: number }) {
   const tab = state.tabs.find(item => item.active);
-  const connected = state.connection.startsWith('已连接');
-  const connection = connected ? `${state.connection.includes('CDP') ? 'CDP' : state.connection.includes('本地') ? '本地' : '已连接'} · ${state.mode.replace('模式', '')}` : '未连接';
+  const connected = state.connection.startsWith('Connected');
+  const connection = connected ? `${state.connection.includes('CDP') ? 'CDP' : state.connection.includes('Managed') ? 'Managed' : 'Connected'} · ${state.mode}` : 'Disconnected';
   const mode = width < 50 && connected ? connection.split(' · ')[0] : connection;
   const model = width < 50 ? state.model.split(' / ')[0] : state.model;
   return <Box width={width}>
     <Box maxWidth={Math.max(12, Math.floor(width * 0.38))} flexShrink={0}><Text color="magentaBright" wrap="truncate-end">{clean(model)}</Text></Box>
     <Box flexShrink={0}><Text dimColor> · </Text></Box>
-    <Box flexShrink={1} minWidth={0}><Text color="cyan" wrap="truncate-end">{tab ? clean(`${tab.tabId} · ${tab.title || '无标题'}`) : '/tab 选择操作页'}</Text></Box>
+    <Box flexShrink={1} minWidth={0}><Text color="cyan" wrap="truncate-end">{tab ? clean(`${tab.tabId} · ${tab.title || 'Untitled'}`) : '/tab Select a tab'}</Text></Box>
     <Box flexShrink={0}><Text dimColor> · </Text></Box><Box flexShrink={0}><Text color={connected ? 'green' : 'gray'}>{mode}</Text></Box>
     {width >= 110 && <Box flexShrink={0}><Text dimColor> · {session}</Text></Box>}
   </Box>;

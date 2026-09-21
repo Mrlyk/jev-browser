@@ -69,7 +69,7 @@ test('shortcuts use the browser directly, unknown commands never reach the model
   assert.equal(s.requests.length, 0);
   assert.equal(s.calls.filter(args => args[0] === 'back').length, 2);
   assert.ok(s.calls.some(args => args.join(' ') === 'scroll down 200'));
-  assert.match(s.controller.state.transcript.map(x => x.text).join('\n'), /是否要用 \/back/);
+  assert.match(s.controller.state.transcript.map(x => x.text).join('\n'), /Did you mean \/back/);
   assert.throws(() => navigationCommand('open', 'javascript:alert(1)'), { code: 'INVALID_ARGUMENT' });
   await s.controller.shutdown();
 });
@@ -115,7 +115,7 @@ test('cancel after dispatch reports unknown result and never replays', async () 
   await s.controller.start(); const action = s.controller.submit('/reload');
   while (!s.calls.some(args => args[0] === 'reload')) await new Promise(resolve => setTimeout(resolve, 1));
   s.controller.cancel(); await action;
-  assert.match(s.controller.state.transcript.at(-1).text, /可能已发送/);
+  assert.match(s.controller.state.transcript.at(-1).text, /may have been sent/);
   assert.equal(s.calls.filter(c => c[0] === 'reload').length, 1); await s.controller.shutdown();
 });
 
@@ -144,7 +144,7 @@ test('same-URL reload invalidates confirmation before a poll', async () => {
   await s.controller.submit('确认');
   assert.equal(s.calls.filter(args => args[0] === 'click').length, 0);
   assert.equal(s.controller.state.pending, undefined);
-  assert.match(s.controller.state.transcript.at(-1).text, /重新加载/);
+  assert.match(s.controller.state.transcript.at(-1).text, /reloaded/);
   await s.controller.shutdown();
 });
 

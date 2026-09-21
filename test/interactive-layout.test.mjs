@@ -5,7 +5,7 @@ import { renderToString } from 'ink';
 import { stripVTControlCharacters } from 'node:util';
 import { Footer, Menu } from '../dist/interactive/Layout.js';
 
-const state = { model: 'TypeSafe / jev-latest', connection: '已连接 · CDP 接入', mode: '模式未知',
+const state = { model: 'TypeSafe / jev-latest', connection: 'Connected · CDP', mode: 'Unknown',
   tabs: [{ active: true, tabId: 't7', title: '中文测试页面及很长的标题'.repeat(8) }] };
 
 test('footer stays on one line and retains provider, tab ID and connection at narrow widths', () => {
@@ -21,7 +21,7 @@ test('footer stays on one line and retains provider, tab ID and connection at na
 
 test('footer clears closed tab titles and never interprets terminal control sequences', () => {
   const text = stripVTControlCharacters(renderToString(h(Footer, { state: { ...state, tabs: [] }, session: 'test', width: 100 })));
-  assert.match(text, /\/tab 选择操作页/); assert.doesNotMatch(text, /中文测试/);
+  assert.match(text, /\/tab Select a tab/); assert.doesNotMatch(text, /中文测试/);
   const dirty = renderToString(h(Footer, { state: { ...state, model: 'TypeSafe\x1b[2J' }, session: 'test', width: 100 }));
   assert.ok(!dirty.includes('\x1b[2J'));
 });

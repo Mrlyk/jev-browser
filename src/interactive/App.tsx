@@ -6,8 +6,8 @@ import { clean } from './messages.js';
 import { edit, graphemes, type Editor } from './editor.js';
 import { Footer, Menu, Welcome } from './Layout.js';
 
-const connections: Array<readonly [string, string]> = [['auto', '连接已有 Chrome（默认）'], ['cdp', '指定 CDP 地址'],
-  ['headed', '新建有头浏览器'], ['headless', '新建无头浏览器'], ['session', '复用已有会话']];
+const connections: Array<readonly [string, string]> = [['auto', 'Connect to existing Chrome (default)'], ['cdp', 'Enter a CDP address'],
+  ['headed', 'Launch a headed browser'], ['headless', 'Launch a headless browser'], ['session', 'Reuse a session']];
 
 export function App({ controller }: { controller: Controller }) {
   const { exit } = useApp();
@@ -22,7 +22,7 @@ export function App({ controller }: { controller: Controller }) {
   const state = controller.state;
   const pendingChoices: Array<readonly [string, string]> | undefined = state.pending ?
     state.pending.choices.length > 1 ? state.pending.choices.map((item, index) => [String(index + 1), item.label]) :
-      [['确认', '执行此次操作'], ['取消', '取消此次操作']] : undefined;
+      [['yes', 'Execute this action'], ['no', 'Cancel this action']] : undefined;
   const picker = state.choosingTab ? state.tabs.map(item => [item.tabId, `${item.title} · ${item.url}`] as const) :
     state.choosingBrowser ? connections : pendingChoices;
   const width = Math.max(12, stdout.columns || 80);
@@ -30,7 +30,7 @@ export function App({ controller }: { controller: Controller }) {
   const activeIndex = Math.min(selection, Math.max(0, matches.length - 1));
   const setText = (value: string) => { setEditor({ value, cursor: graphemes(value).length }); setSelection(0); setDismissed(false); };
   const submit = (value: string) => {
-    if (controller.isBusy) { controller.log('正在执行上一条操作，输入已保留。'); return; }
+    if (controller.isBusy) { controller.log('An action is running. Your input has been kept.'); return; }
     setHistory(items => [...items, value].slice(-100)); setHistoryIndex(-1); setDraft('');
     void controller.submit(value).then(() => controller.reconnect());
     setText('');
@@ -108,13 +108,13 @@ export function App({ controller }: { controller: Controller }) {
     <Box flexDirection="column" minHeight={Math.max(0, (stdout.rows || 24) - welcomeLines - historyLines - state.transcript.length - 1)} justifyContent="flex-end">
       {state.phase && <Text color="cyan" wrap="truncate-end">{state.phase}</Text>}
       {state.pending && <Box flexDirection="column">
-        <Text color="yellow">待确认 · {clean(state.pending.plan.target?.name ?? state.pending.plan.operation)}</Text>
+        <Text color="yellow">Confirmation · {clean(state.pending.plan.target?.name ?? state.pending.plan.operation)}</Text>
       </Box>}
       <Text color="magenta">{'─'.repeat(width)}</Text>
-      {menu ? <Menu items={menu} selected={Math.min(selection, Math.max(0, menu.length - 1))} title={state.choosingTab ? '选择操作标签页' : state.choosingBrowser ? '选择连接方式' : (state.pending?.choices.length ?? 0) > 1 ? '选择操作目标' : '是否执行'} /> :
+      {menu ? <Menu items={menu} selected={Math.min(selection, Math.max(0, menu.length - 1))} title={state.choosingTab ? 'Select a tab' : state.choosingBrowser ? 'Select a connection' : (state.pending?.choices.length ?? 0) > 1 ? 'Select a target' : 'Execute this action?'} /> :
         <Box flexDirection="column">
           <Text>› {before}<Text inverse>{chars[editor.cursor] === '\n' ? ' ' : chars[editor.cursor] ?? ' '}</Text>{after}</Text>
-          {matches.length > 0 && <Menu items={matches.map(([name, label]) => [`/${name}`, label])} selected={activeIndex} title="命令" />}
+          {matches.length > 0 && <Menu items={matches.map(([name, label]) => [`/${name}`, label])} selected={activeIndex} title="Commands" />}
         </Box>}
       <Text color="magenta">{'─'.repeat(width)}</Text>
       <Footer state={state} session={controller.options.session} width={width} />
