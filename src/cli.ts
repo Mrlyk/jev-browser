@@ -7,7 +7,7 @@ import { JevError, failure } from './errors.js';
 import { withSession } from './session.js';
 import { ensureLogin, handleAuth } from './auth.js';
 
-const help = `jev-browser 0.1.3 — Jev 语义浏览器 CLI
+const help = `jev-browser 0.2.0 — Jev 语义浏览器 CLI
 
 用法：jev-browser [全局参数] <资源> <动作> [会话名] [对象] [选项]
 
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   if (!args.length || args[0] === '--help' || args[0] === '-h') {
     process.stdout.write(help); return;
   }
-  if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.1.3\n'); return; }
+  if (args[0] === '--version' || args[0] === '-V') { process.stdout.write('jev-browser 0.2.0\n'); return; }
   const parsed = parseArgs(args);
   if (parsed.help) { process.stdout.write(parsed.help); return; }
   if (parsed.name === 'close' && parsed.rest.some(arg => ['--help', '-h'].includes(arg))) {

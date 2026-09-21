@@ -4,7 +4,7 @@ import { clean } from './messages.js';
 export function Welcome({ width }: { width: number }) {
   const wide = width >= 66;
   return <Box flexDirection="column" width={Math.min(width, 80)} marginBottom={1}>
-    <Text dimColor>jevb v0.1.3</Text>
+    <Text dimColor>jevb v0.2.0</Text>
     <Box borderStyle="single" borderColor="gray" flexDirection={wide ? 'row' : 'column'} paddingX={1}>
       <Box width={wide ? 22 : undefined} flexDirection="column" alignItems={wide ? 'center' : 'flex-start'} paddingY={1}>
         <Text bold>Welcome to Jev</Text>

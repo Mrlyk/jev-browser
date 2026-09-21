@@ -1,6 +1,6 @@
 {
   "name": "jev-browser-cli",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Interactive browser terminal and automation CLI powered by Jev",
   "type": "module",
   "license": "Apache-2.0",
@@ -13,6 +13,7 @@
   },
   "files": [
     "dist",
+    "docs/images",
     "libexec",
     "skills",
     "third-party",
