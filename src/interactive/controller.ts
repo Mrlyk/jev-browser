@@ -13,7 +13,7 @@ export type Tab = { tabId: string; targetId: string; title: string; url: string;
 type Pending = { plan: Plan; expires: number; choices: Array<{ ref: string; label: string }>; instruction: string; document?: number };
 export type ViewState = { busy: boolean; phase: string; connection: string; mode: string; model: string;
   modelState: string; tabs: Tab[]; pending?: Pending; choosingTab: boolean; choosingBrowser: boolean;
-  transcript: Array<{ id: number; text: string }>; revision: number; exited: boolean };
+  transcript: Array<{ id: number; text: string; role: 'user' | 'assistant' }>; revision: number; exited: boolean };
 type Dependencies = { models?: Models; browser?: (options: InteractiveOptions, lifecycle: {
   signal: AbortSignal; onDispatch: () => void }) => Browser };
 
@@ -41,8 +41,8 @@ export class Controller extends EventEmitter {
   }
   private emitState() { this.emit('change'); }
   private phase(text: string) { this.state.phase = text; this.emitState(); }
-  log(text: string) {
-    this.state.transcript = [...this.state.transcript, { id: ++this.sequence, text: clean(text) }];
+  log(text: string, role: 'user' | 'assistant' = 'assistant') {
+    this.state.transcript = [...this.state.transcript, { id: ++this.sequence, text: clean(text), role }];
     // Keep the in-memory transcript bounded; Static has already printed earlier entries.
     if (this.state.transcript.length > 200) { this.state.transcript = this.state.transcript.slice(-1); this.state.revision++; }
     this.emitState();
@@ -126,7 +126,7 @@ export class Controller extends EventEmitter {
     if (this.state.busy || this.refreshing) { this.log('正在处理上一条操作，请完成后再发送。'); return; }
     const input = aliases[text] ?? text;
     if (/^\/(exit|quit)( --close)?$/.test(input)) { await this.shutdown(input.endsWith('--close')); return; }
-    this.log(`你 › ${text}`);
+    this.log(text, 'user');
     await this.perform(async (browser, signal) => {
       if (input.startsWith('/')) { await this.slash(input, browser); return; }
       if (this.state.pending && await this.answer(input, browser)) { await this.refresh(browser); return; }

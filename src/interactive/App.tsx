@@ -96,12 +96,15 @@ export function App({ controller }: { controller: Controller }) {
   const before = chars.slice(Math.max(0, editor.cursor - 100), editor.cursor).join('');
   const after = chars.slice(editor.cursor + 1, editor.cursor + 80).join('');
   const menu = picker;
-  const entries = [{ id: 0, text: '' }, ...state.transcript];
-  const historyLines = state.transcript.reduce((total, entry) => total + entry.text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(graphemes(line).length * 1.5 / width)), 0), 0);
+  const entries = [{ id: 0, text: '', role: 'assistant' as const }, ...state.transcript];
+  const historyLines = state.transcript.reduce((total, entry) => total + (entry.role === 'user' ? 2 : 0) + entry.text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(graphemes(line).length * 1.5 / (width - (entry.role === 'user' ? 2 : 0)))), 0), 0);
   const welcomeLines = width >= 66 ? 15 : 18;
   return <Box flexDirection="column">
     <Static key={state.revision} items={entries}>{entry => entry.id === 0 ? <Welcome key={0} width={width} /> :
-      <Box key={entry.id} marginBottom={1}><Text>{entry.text}</Text></Box>}</Static>
+      <Box key={entry.id} width={width} marginBottom={1} paddingX={entry.role === 'user' ? 1 : 0}
+        paddingY={entry.role === 'user' ? 1 : 0} backgroundColor={entry.role === 'user' ? '#e8e8e8' : undefined}>
+        <Text color={entry.role === 'user' ? '#242424' : undefined}>{entry.text}</Text>
+      </Box>}</Static>
     <Box flexDirection="column" minHeight={Math.max(0, (stdout.rows || 24) - welcomeLines - historyLines - state.transcript.length - 1)} justifyContent="flex-end">
       {state.phase && <Text color="cyan" wrap="truncate-end">{state.phase}</Text>}
       {state.pending && <Box flexDirection="column">

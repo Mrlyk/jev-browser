@@ -50,6 +50,8 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 32, 100, 0, 0))
     env = dict(os.environ, TERM='xterm-256color', TYPESAFE_API_KEY='', OPENROUTER_API_KEY='',
                XDG_CONFIG_HOME=directory, NODE_OPTIONS='', JEV_BROWSER_RUNTIME_DIR=str(work / 'runtime'))
+    env['FORCE_COLOR'] = '3'
+    env.pop('NO_COLOR', None)
     process = subprocess.Popen(['node', '--import', str(hook), 'dist/cli.js'], cwd=root, env=env,
                                stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
     output = bytearray()
@@ -94,7 +96,10 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
         send('中文e\u0301')
         send('\x7f')
         enter('输入')
-        wait_for('你 › 中文输入')
+        wait_for(' 中文输入')
+        assert '你 ›' not in rendered()
+        assert re.search(r'(?m)^ 中文输入 +\r?$', rendered())
+        assert any(color in output for color in [b'\x1b[48;2;232;232;232m', b'\x1b[48;5;254m'])
         # Bracketed multiline paste must not execute any line.
         send('\x1b[200~/back\n/reload\x1b[201~')
         dispatched = [json.loads(line) for line in calls.read_text().splitlines()]
@@ -104,11 +109,11 @@ Browser.prototype.requestBatch = async function(commands) { return Promise.all(c
         send('/sta')
         send('\t')
         send('\r')
-        wait_for('你 › /status')
+        wait_for(' /status')
         send('\x1b[A')
         send('\r')
         read_for(0.3)
-        assert rendered().count('你 › /status') >= 2
+        assert len(re.findall(r'(?m)^ /status +\r?$', rendered())) >= 2
         # Slash menu replaces the toolbar. Arrow selection invokes /go.
         send('/')
         wait_for('命令 · ↑↓ 选择')
