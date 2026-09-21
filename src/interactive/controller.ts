@@ -89,16 +89,16 @@ export class Controller extends EventEmitter {
     const timer = setTimeout(() => request.abort(), 5000);
     try { await withSession(this.options.session, () => this.refresh(this.browser(request.signal))); }
     catch (error) {
-      if (!(error instanceof JevError && error.code === 'SESSION_BUSY')) { this.state.connection = '连接中断 · /browser 重新连接'; this.state.tabs = []; this.reset(); }
+      if (!(error instanceof JevError && error.code === 'SESSION_BUSY')) { this.state.connection = '连接中断 · /connect 重新连接'; this.state.tabs = []; this.reset(); }
     } finally { clearTimeout(timer); if (this.request === request) this.request = undefined; this.refreshing = false; this.emitState(); }
   }
   async start() { return this.perform(async browser => {
-    this.phase('正在连接浏览器…');
+    this.phase(this.options.autoConnect ? '正在连接已有 Chrome… 如出现授权弹窗，请在浏览器中允许。Esc 取消' : '正在连接浏览器…');
     const info = await browser.request(['session', 'info']);
     this.owned = !info.active && !this.options.cdp && !this.options.autoConnect;
     await browser.request(['tab', 'list']);
     await this.refresh(browser);
-    this.log('输入一句话操作浏览器，/help 查看命令。');
+    this.log('输入一句话操作浏览器，/ 查看命令。');
   }); }
   private async perform(action: (browser: Browser, signal: AbortSignal) => Promise<void>) {
     if (this.state.busy || this.refreshing || this.stopping) { this.log('正在处理上一条操作，请完成后再发送。'); return; }
@@ -125,7 +125,7 @@ export class Controller extends EventEmitter {
     const text = raw.trim(); if (!text || this.stopping) return;
     if (this.state.busy || this.refreshing) { this.log('正在处理上一条操作，请完成后再发送。'); return; }
     const input = aliases[text] ?? text;
-    if (input === '/quit' || input === '/quit --close') { await this.shutdown(input.endsWith('--close')); return; }
+    if (/^\/(exit|quit)( --close)?$/.test(input)) { await this.shutdown(input.endsWith('--close')); return; }
     this.log(`你 › ${text}`);
     await this.perform(async (browser, signal) => {
       if (input.startsWith('/')) { await this.slash(input, browser); return; }
@@ -158,7 +158,7 @@ export class Controller extends EventEmitter {
         const issue = plan.uncertainties.find(item => item.alternatives.some(choice => choice.ref));
         const choices = issue?.alternatives.filter(item => item.ref).map(item => ({ ref: item.ref!, label: item.label })) ?? [];
         this.state.pending = { plan, choices, instruction, document, expires: Date.now() + 300_000 };
-        this.log(`${planMessage(plan)}\n${choices.length > 1 ? '请选择目标序号，或输入更具体的操作。' : '输入「确认」执行，Esc 取消；新操作会替换本次确认。'}`);
+        this.log(`${planMessage(plan)}\n${choices.length > 1 ? '使用 ↑↓ 选择目标，Enter 确定。' : '使用 ↑↓ 选择执行或取消，Enter 确定。'}`);
       } else await this.execute(plan, browser);
       await this.refresh(browser);
     });
@@ -176,7 +176,7 @@ export class Controller extends EventEmitter {
       pending.plan.uncertainties = pending.plan.uncertainties.filter(issue => !issue.alternatives.some(item => item.ref));
       await validatePlan(pending.plan, browser);
       pending.choices = [];
-      this.log(`${planMessage(pending.plan)}\n输入「确认」执行，Esc 取消。`); return true;
+      this.log(`${planMessage(pending.plan)}\n使用 ↑↓ 选择执行或取消，Enter 确定。`); return true;
     }
     if (/^(确认|是|y|yes)$/i.test(input)) {
       if (pending.choices.length > 1) { this.log('请先选择具体目标。'); return true; }
@@ -206,7 +206,7 @@ export class Controller extends EventEmitter {
   }
   private async slash(input: string, browser: Browser) {
     const { name, value } = parseCommand(input);
-    if (['help', 'status', 'tabs', 'clear', 'reset'].includes(name) && value) throw new JevError('INVALID_ARGUMENT', `/${name} 不接受参数。`);
+    if (['help', 'status', 'clear', 'reset'].includes(name) && value) throw new JevError('INVALID_ARGUMENT', `/${name} 不接受参数。`);
     if (name === 'help') { this.log(commandHelp); return; }
     if (name === 'status') { await this.refresh(browser); this.log(JSON.stringify({ session: this.options.session,
       connection: this.state.connection, mode: this.state.mode, model: this.state.model, modelState: this.state.modelState,
@@ -218,17 +218,17 @@ export class Controller extends EventEmitter {
       if (!['auto', 'typesafe', 'openrouter'].includes(value)) throw new JevError('INVALID_ARGUMENT', '提供方：auto、typesafe、openrouter。');
       this.reset(); this.options.provider = value as InteractiveOptions['provider']; this.updateModel(); this.log(`模型：${this.state.model}`); return;
     }
-    if (name === 'browser') {
+    if (name === 'connect') {
       if (!value) { this.state.choosingBrowser = true; return; }
       // Reconnect after this operation releases the old session lock.
       const [kind, ...rest] = value.split(/\s+/); const target = rest.join(' ');
       const args = kind === 'session' ? ['--session', target] : kind === 'cdp' ? ['--cdp', target] :
         kind === 'auto' ? ['--auto-connect'] : kind === 'headless' ? ['--headless'] : kind === 'headed' ? ['--headed'] : undefined;
-      if (!args || (['auto', 'headed', 'headless'].includes(kind) && target)) throw new JevError('INVALID_ARGUMENT', '/browser headed|headless|auto|cdp <地址>|session <名称>');
+      if (!args || (['auto', 'headed', 'headless'].includes(kind) && target)) throw new JevError('INVALID_ARGUMENT', '/connect auto|headed|headless|cdp <地址>|session <名称>');
       this.nextConnection = parseInteractive([...args, '--model-provider', this.options.provider]);
       this.reset(); this.state.choosingBrowser = false; return;
     }
-    if (name === 'tabs') { await this.refresh(browser); this.state.choosingTab = true; return; }
+    if (name === 'tab' && !value) { await this.refresh(browser); this.state.choosingTab = true; return; }
     const command = navigationCommand(name, value);
     if (!command) throw new JevError('INVALID_ARGUMENT', `/${name} 参数无效。`);
     this.reset(); this.state.choosingTab = false;
@@ -243,7 +243,7 @@ export class Controller extends EventEmitter {
   }
   async shutdown(closeBrowser = false) {
     if (this.stopping) return;
-    if (closeBrowser && !this.owned) { this.log('只能关闭本次交互创建的浏览器；使用 /quit 保留并退出。'); return; }
+    if (closeBrowser && !this.owned) { this.log('只能关闭本次交互创建的浏览器；使用 /exit 保留并退出。'); return; }
     this.stopping = true; this.request?.abort(); await this.task;
     if (closeBrowser) {
       try {

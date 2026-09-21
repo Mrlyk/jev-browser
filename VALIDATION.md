@@ -134,3 +134,12 @@ Key 通过临时进程环境传入，没有写入项目文件或测试报告。
 本轮未配置 OpenRouter Key，其真实网络测试跳过；提供方切换、切回复用和双 Key 优先级由受控测试覆盖。首屏计时使用浏览器执行桩，模型耗时为上述小样本，均不包含浏览器启动时间。
 
 复现脚本位于 `test/interactive*.mjs`、`test/interactive-pty.py`、`test/transport*.mjs` 和 `test/model-reuse.mjs`。本机输出保存在 `.cache/tui-validation/`，真实模型结果另存于 `.cache/interactive-live.json`、`.cache/model-reuse.json`。
+
+## 交互布局调整（2026-09-21）
+
+- 采用欢迎区、操作记录、横线输入区和底部状态栏；页面标题、Tab、模型提供方和连接模式统一显示在输入区下方。
+- `/` 实时显示命令菜单，`/go` 前进、`/back` 后退、`/tab` 选页、`/connect` 切换连接、`/exit` 退出。默认连接已有 Chrome，显式 `--headed`、`--headless` 新建浏览器。
+- 目标澄清及二次确认使用方向键和 Enter 选择。确认菜单替换输入区，支持执行、取消及 Esc 退出。
+- `JEV_TEST_NATIVE=1 npm test`：114/114 通过，无跳过。覆盖默认连接参数、连接模式切换、旧命令别名和底部状态栏在 30/60/100/120 列宽下的显示。
+- `npm run test:tui`：真实 PTY 通过，包含斜杠菜单、连接及标签页选择、键盘确认与取消、中文输入、粘贴、补全、历史、缩放和终端恢复。本轮浏览器交互使用执行桩，未接管用户日常 Chrome。
+- `.cache/tui-pi/` 保存测试输出及使用测试页面状态的 Ink 渲染预览。

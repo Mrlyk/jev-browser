@@ -53,9 +53,10 @@ For non-interactive login, logout, and credential storage, see the [authenticati
 jevb
 ```
 
-Type instructions continuously, such as `Open https://example.com` or `Click Learn more`. The input area shows the selected tab, browser connection, and model provider. A new session opens a visible browser by default.
+Type instructions continuously, such as `Open https://example.com` or `Click Learn more`. By default, jevb connects to your existing Chrome. Enable remote debugging at `chrome://inspect/#remote-debugging` and allow the connection. The footer below the editor shows the page title, tab, model provider, and connection mode.
 
 ```bash
+jevb tui --headed
 jevb tui --headless
 jevb tui --session demo
 jevb tui --cdp 9222
@@ -65,21 +66,23 @@ jevb tui --model-provider openrouter
 
 | Command | Action |
 | --- | --- |
-| `/back`, `/forward`, `/reload` | Navigate or refresh |
+| `/back`, `/go`, `/reload` | Navigate or refresh |
 | `/up [px]`, `/down [px]`, `/top`, `/bottom` | Scroll |
 | `/open <url>`, `/new [url]` | Open a page or new tab |
-| `/tabs`, `/tab <id>`, `/close [id]` | Select, switch, or close a tab |
+| `/tab`, `/tab <id>`, `/close [id]` | Select, switch, or close a tab |
 | `/provider auto\|typesafe\|openrouter` | Change model provider for this session |
-| `/browser` | Choose a browser connection; the previous browser stays open |
+| `/connect` | Choose existing Chrome, CDP, headed, headless, or an existing session |
 | `/status` | Show session and connection statistics |
 | `/clear`, `/reset` | Clear the display or reset operation context |
-| `/help`, `/quit` | Show commands or exit |
+| `/help`, `/exit` | Show commands or exit |
 
-Enter sends; ↑/↓ browse history; Tab completes commands or selects the action bar; ←/→ move the cursor or select an action. Esc cancels. Ctrl+C cancels an active operation or exits when idle. Pasted multiline text stays in the input until you send it.
+Type `/` to browse commands. Use ↑/↓ to select, Enter to run, and Tab to complete. Outside menus, ↑/↓ browse history and ←/→ move the cursor. Esc cancels. Ctrl+C cancels work, clears input, or exits when the input is empty. Multiline paste waits for Enter.
 
-When prompted, enter a target number, then `yes` to confirm. Changing pages invalidates pending confirmations. Cancelling an action already sent to the browser cannot undo it; check the page before retrying.
+When prompted, use ↑/↓ and Enter to select a target or choose whether to execute or cancel. Changing pages invalidates pending confirmations. Cancelling an action already sent to the browser cannot undo it; check the page before retrying.
 
-The selected tab stays bound to the session. Use `/tabs` to change it. `/quit` keeps the browser running; reconnect with the printed session command. `/quit --close` also closes a browser created by this interaction.
+`/connect auto` attaches to Chrome; `/connect headed` or `/connect headless` launches a new browser; `/connect cdp 9222` uses a specific address. The previous browser stays open.
+
+The selected tab stays bound to the session. Use `/tab` to change it. `/exit` keeps the browser running; reconnect with the printed session command. `/exit --close` also closes a browser created by this interaction.
 
 No API key is needed for slash commands. Input history stays in memory. Interactive mode requires a terminal; existing CLI commands and piped calls retain their behavior.
 

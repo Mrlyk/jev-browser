@@ -51,10 +51,11 @@ export TYPESAFE_API_KEY="你的 API Key"
 jevb
 ```
 
-连续输入“打开 https://example.com”“点击 Learn more 链接”等指令。输入框上方显示操作标签页、浏览器连接和模型提供方。默认创建独立会话并打开有头浏览器。
+连续输入“打开 https://example.com”“点击 Learn more 链接”等指令。默认连接已有 Chrome；在 `chrome://inspect/#remote-debugging` 开启远程调试，并允许连接。输入框下方显示页面标题、Tab、模型提供方和连接模式。
 
 ```bash
-jevb tui --headless                   # 无头浏览器
+jevb tui --headed                     # 新建有头浏览器
+jevb tui --headless                   # 新建无头浏览器
 jevb tui --session demo               # 复用已有会话
 jevb tui --cdp 9222                   # 连接指定浏览器
 jevb tui --auto-connect               # 连接本机 Chrome
@@ -63,21 +64,23 @@ jevb tui --model-provider openrouter  # 指定模型提供方
 
 | 命令 | 用途 |
 | --- | --- |
-| `/back`、`/forward`、`/reload` | 后退、前进、刷新 |
+| `/back`、`/go`、`/reload` | 后退、前进、刷新 |
 | `/up [px]`、`/down [px]`、`/top`、`/bottom` | 滚动页面 |
 | `/open <url>`、`/new [url]` | 打开页面、新建标签页 |
-| `/tabs`、`/tab <id>`、`/close [id]` | 选择、切换、关闭标签页 |
+| `/tab`、`/tab <id>`、`/close [id]` | 选择、切换、关闭标签页 |
 | `/provider auto\|typesafe\|openrouter` | 切换本次会话的模型提供方 |
-| `/browser` | 选择浏览器连接，保留原浏览器 |
+| `/connect` | 选择已有 Chrome、CDP、有头、无头或已有会话 |
 | `/status` | 查看会话和连接统计 |
 | `/clear`、`/reset` | 清理显示、重置操作上下文 |
-| `/help`、`/quit` | 查看命令、退出 |
+| `/help`、`/exit` | 查看命令、退出 |
 
-Enter 发送，↑/↓ 浏览历史，Tab 补全命令或进入快捷栏，←/→ 移动光标或选择快捷操作。Esc 取消；Ctrl+C 在执行中取消、空闲时退出。粘贴多行文字后需按 Enter 才会发送。
+输入 `/` 打开命令菜单，↑/↓ 选择，Enter 执行，Tab 补全。无菜单时，↑/↓ 浏览历史，←/→ 移动光标。Esc 取消；Ctrl+C 取消执行或清空输入，输入为空时退出。粘贴多行文字后需按 Enter 发送。
 
-出现确认提示时，按需输入目标序号，再输入“确认”执行。页面改变会使旧确认失效。动作已经发送后，取消无法撤销它，请检查页面结果再继续。
+需要确认时，用 ↑/↓ 选择目标或“执行 / 取消”，Enter 确定。页面改变会使旧确认失效。动作已经发送后，取消无法撤销它，请检查页面结果再继续。
 
-操作标签页绑定到会话，通过 `/tabs` 切换。`/quit` 保留浏览器，按退出时打印的命令重新连接；`/quit --close` 同时关闭本次交互创建的浏览器。
+`/connect auto` 连接已有 Chrome，`/connect headed`、`/connect headless` 新建浏览器，`/connect cdp 9222` 连接指定地址。切换连接保留原浏览器。
+
+操作标签页绑定到会话，通过 `/tab` 切换。`/exit` 保留浏览器，按退出时打印的命令重新连接；`/exit --close` 同时关闭本次交互创建的浏览器。
 
 未配置 Key 时仍可使用快捷命令。输入历史仅保存在内存中。交互模式需要终端；已有 CLI 命令和管道调用方式保持不变。
 

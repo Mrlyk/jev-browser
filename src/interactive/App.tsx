@@ -1,73 +1,83 @@
 import { useEffect, useReducer, useState } from 'react';
-import { Box, Static, Text, useApp, useInput, usePaste } from 'ink';
+import { Box, Static, Text, useApp, useInput, usePaste, useStdout } from 'ink';
 import { Controller } from './controller.js';
-import { commands, shortcuts } from './commands.js';
+import { commands } from './commands.js';
 import { clean } from './messages.js';
 import { edit, graphemes, type Editor } from './editor.js';
+import { Footer, Menu, Welcome } from './Layout.js';
 
-const connections = [['headed', '新建有头浏览器'], ['headless', '新建无头浏览器'], ['auto', '连接本机 Chrome'],
-  ['cdp', '输入 CDP 地址'], ['session', '输入已有会话名']];
+const connections: Array<readonly [string, string]> = [['auto', '连接已有 Chrome（默认）'], ['cdp', '指定 CDP 地址'],
+  ['headed', '新建有头浏览器'], ['headless', '新建无头浏览器'], ['session', '复用已有会话']];
 
 export function App({ controller }: { controller: Controller }) {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const [, redraw] = useReducer(x => x + 1, 0);
   const [editor, setEditor] = useState<Editor>({ value: '', cursor: 0 });
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [draft, setDraft] = useState('');
-  const [bar, setBar] = useState(-1);
   const [selection, setSelection] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
   const state = controller.state;
-  const setText = (value: string) => setEditor({ value, cursor: graphemes(value).length });
+  const pendingChoices: Array<readonly [string, string]> | undefined = state.pending ?
+    state.pending.choices.length > 1 ? state.pending.choices.map((item, index) => [String(index + 1), item.label]) :
+      [['确认', '执行此次操作'], ['取消', '取消此次操作']] : undefined;
+  const picker = state.choosingTab ? state.tabs.map(item => [item.tabId, `${item.title} · ${item.url}`] as const) :
+    state.choosingBrowser ? connections : pendingChoices;
+  const width = Math.max(12, stdout.columns || 80);
+  const matches = !dismissed && /^\/\S*$/.test(editor.value) ? commands.filter(([name]) => `/${name}`.startsWith(editor.value)) : [];
+  const activeIndex = Math.min(selection, Math.max(0, matches.length - 1));
+  const setText = (value: string) => { setEditor({ value, cursor: graphemes(value).length }); setSelection(0); setDismissed(false); };
   const submit = (value: string) => {
     if (controller.isBusy) { controller.log('正在执行上一条操作，输入已保留。'); return; }
+    setHistory(items => [...items, value].slice(-100)); setHistoryIndex(-1); setDraft('');
     void controller.submit(value).then(() => controller.reconnect());
+    setText('');
   };
   useEffect(() => {
     const listener = () => { redraw(); if (controller.state.exited) exit(); };
-    controller.on('change', listener);
+    controller.on('change', listener); stdout.on('resize', redraw);
     void controller.start();
     const timer = setInterval(() => { void controller.poll(); }, 2000);
-    return () => { clearInterval(timer); controller.off('change', listener); };
-  }, [controller, exit]);
+    return () => { clearInterval(timer); controller.off('change', listener); stdout.off('resize', redraw); };
+  }, [controller, exit, stdout]);
   useEffect(() => { setSelection(0); }, [state.choosingTab, state.choosingBrowser, state.pending]);
-  usePaste(text => { setBar(-1); setEditor(current => edit(current, { insert: text })); });
+  usePaste(text => { if (state.pending) controller.cancel(); setDismissed(false); setSelection(0); setEditor(current => edit(current, { insert: text })); });
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
       if (controller.isBusy || state.pending || state.choosingTab || state.choosingBrowser) controller.cancel();
+      else if (editor.value) setText('');
       else void controller.shutdown();
       return;
     }
-    if (key.escape) { if (bar >= 0) setBar(-1); else controller.cancel(); return; }
-    const menu = state.choosingTab ? state.tabs.map(tab => [tab.tabId, tab.title]) : state.choosingBrowser ? connections : undefined;
+    if (key.escape) { if (picker) controller.cancel(); else if (matches.length) setDismissed(true); else controller.cancel(); return; }
+    const menu = picker;
     if (menu) {
-      if (key.upArrow || key.downArrow) setSelection(index => (index + (key.upArrow ? -1 : 1) + menu.length) % Math.max(1, menu.length));
-      if (key.return && menu[selection]) {
-        const value = menu[selection][0];
-        if (state.choosingTab) submit(`/tab ${value}`);
-        else if (['session', 'cdp'].includes(value)) { state.choosingBrowser = false; setText(`/browser ${value} `); }
-        else submit(`/browser ${value}`);
+      const index = Math.min(selection, Math.max(0, menu.length - 1));
+      if (key.upArrow || key.downArrow || key.tab) setSelection((index + (key.upArrow || key.tab && key.shift ? -1 : 1) + menu.length) % Math.max(1, menu.length));
+      if (key.return && menu[index]) {
+        const value = menu[index][0];
+        if (pendingChoices) submit(value);
+        else if (state.choosingTab) submit(`/tab ${value}`);
+        else if (['session', 'cdp'].includes(value)) { controller.cancel(); setText(`/connect ${value} `); }
+        else submit(`/connect ${value}`);
       }
-      return;
-    }
-    if (key.tab) {
-      const matches = editor.value.startsWith('/') ? commands.filter(([name]) => `/${name}`.startsWith(editor.value)) : [];
-      if (matches.length === 1) setText(`/${matches[0][0]} `);
-      else if (matches.length) controller.log(matches.map(([name]) => `/${name}`).join('  '));
-      else setBar(index => (index + 1) % shortcuts.length);
-      return;
-    }
-    if (bar >= 0) {
-      if (key.leftArrow || key.rightArrow) setBar(index => (index + (key.leftArrow ? -1 : 1) + shortcuts.length) % shortcuts.length);
-      if (key.return) { submit(`/${shortcuts[bar]}`); setBar(-1); }
+      if (pendingChoices && !key.ctrl && !key.meta && !key.return && input && !/[\x00-\x1f\x7f]/.test(input)) { controller.cancel(); setText(input); }
       return;
     }
     if (key.return && (key.shift || key.meta)) { setEditor(current => edit(current, { insert: '\n' })); return; }
+    if (matches.length && (key.upArrow || key.downArrow)) {
+      setSelection((activeIndex + (key.upArrow ? -1 : 1) + matches.length) % matches.length); return;
+    }
+    if (key.tab) { if (matches.length) setText(`/${matches[activeIndex][0]} `); return; }
     if (key.return) {
       if (!editor.value.trim()) return;
-      if (controller.isBusy) { controller.log('正在执行上一条操作，输入已保留。'); return; }
-      setHistory(items => [...items, editor.value].slice(-100)); setHistoryIndex(-1); setDraft('');
-      submit(editor.value); setText(''); return;
+      if (matches.length && !commands.some(([name]) => editor.value === `/${name}`)) {
+        const name = matches[activeIndex][0];
+        if (name === 'open') setText('/open '); else submit(`/${name}`);
+      } else submit(editor.value);
+      return;
     }
     if (key.upArrow || key.downArrow) {
       if (historyIndex < 0) setDraft(editor.value);
@@ -78,34 +88,33 @@ export function App({ controller }: { controller: Controller }) {
     }
     if (key.leftArrow || key.rightArrow) { setEditor(current => edit(current, { move: key.leftArrow ? -1 : 1 })); return; }
     if (key.home || key.end || key.ctrl && ['a', 'e'].includes(input)) { setEditor(current => edit(current, { edge: key.home || input === 'a' ? 'start' : 'end' })); return; }
-    if (key.backspace || key.delete) { setEditor(current => edit(current, { remove: key.backspace ? 'before' : 'after' })); return; }
+    if (key.backspace || key.delete) { setDismissed(false); setSelection(0); setEditor(current => edit(current, { remove: key.backspace ? 'before' : 'after' })); return; }
     if (key.ctrl && input === 'u') { setText(''); return; }
-    if (!key.ctrl && !key.meta && input) setEditor(current => edit(current, { insert: input }));
+    if (!key.ctrl && !key.meta && input) { setDismissed(false); setSelection(0); setEditor(current => edit(current, { insert: input })); }
   });
-  const tab = state.tabs.find(item => item.active);
   const chars = graphemes(editor.value);
-  // A bounded viewport keeps the caret visible even for long or pasted input.
   const before = chars.slice(Math.max(0, editor.cursor - 100), editor.cursor).join('');
   const after = chars.slice(editor.cursor + 1, editor.cursor + 80).join('');
+  const menu = picker;
+  const entries = [{ id: 0, text: '' }, ...state.transcript];
+  const historyLines = state.transcript.reduce((total, entry) => total + entry.text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(graphemes(line).length * 1.5 / width)), 0), 0);
+  const welcomeLines = width >= 66 ? 15 : 18;
   return <Box flexDirection="column">
-    <Static key={state.revision} items={state.transcript}>{entry => <Text key={entry.id}>{entry.text}</Text>}</Static>
-    <Box flexDirection="column" marginTop={1}>
-      <Text color="green" bold>Jev Browser · {controller.options.session}</Text>
-      {state.phase && <Text>{state.phase}</Text>}
-      <Text wrap="truncate-end">操作页  {tab ? clean(`${tab.tabId} · ${tab.title || '无标题'} · 共 ${state.tabs.length} 个标签页`) : '未选择 · /tabs 选择或 /new 新建'}</Text>
-      {tab && <Text dimColor wrap="truncate-end">{clean(tab.url)}</Text>}
-      <Text>连接    {state.connection} / {state.mode}</Text>
-      <Text>模型    {state.model} · {state.modelState}</Text>
-      {state.choosingTab && state.tabs.map((item, index) => <Text key={item.tabId} color={selection === index ? 'green' : undefined}>{selection === index ? '› ' : '  '}{clean(`${item.tabId} · ${item.title} · ${item.url}`)}</Text>)}
-      {state.choosingBrowser && connections.map((item, index) => <Text key={item[0]} color={selection === index ? 'green' : undefined}>{selection === index ? '› ' : '  '}{item[1]}</Text>)}
+    <Static key={state.revision} items={entries}>{entry => entry.id === 0 ? <Welcome key={0} width={width} /> :
+      <Box key={entry.id} marginBottom={1}><Text>{entry.text}</Text></Box>}</Static>
+    <Box flexDirection="column" minHeight={Math.max(0, (stdout.rows || 24) - welcomeLines - historyLines - state.transcript.length - 1)} justifyContent="flex-end">
+      {state.phase && <Text color="cyan" wrap="truncate-end">{state.phase}</Text>}
       {state.pending && <Box flexDirection="column">
         <Text color="yellow">待确认 · {clean(state.pending.plan.target?.name ?? state.pending.plan.operation)}</Text>
-        {state.pending.choices.map((item, index) => <Text key={item.ref}>{index + 1}. {clean(item.label)}</Text>)}
-        <Text dimColor>{state.pending.choices.length > 1 ? '输入序号选择目标' : '输入「确认」执行'} · Esc 取消</Text>
       </Box>}
-      <Box flexWrap="wrap">{shortcuts.map((name, index) => <Text key={name} inverse={bar === index}> [{commands.find(([key]) => key === name)![1].replace(' [px]', '')}] </Text>)}</Box>
-      <Box borderStyle="round" borderColor="green" paddingX={1}><Text>› {before}<Text inverse>{chars[editor.cursor] === '\n' ? ' ' : chars[editor.cursor] ?? ' '}</Text>{after}</Text></Box>
-      <Text dimColor>Enter 发送 · ↑↓ 历史 · Tab 补全/快捷栏 · Esc 取消 · /help</Text>
+      <Text color="magenta">{'─'.repeat(width)}</Text>
+      {menu ? <Menu items={menu} selected={Math.min(selection, Math.max(0, menu.length - 1))} title={state.choosingTab ? '选择操作标签页' : state.choosingBrowser ? '选择连接方式' : (state.pending?.choices.length ?? 0) > 1 ? '选择操作目标' : '是否执行'} /> :
+        <Box flexDirection="column">
+          <Text>› {before}<Text inverse>{chars[editor.cursor] === '\n' ? ' ' : chars[editor.cursor] ?? ' '}</Text>{after}</Text>
+          {matches.length > 0 && <Menu items={matches.map(([name, label]) => [`/${name}`, label])} selected={activeIndex} title="命令" />}
+        </Box>}
+      <Text color="magenta">{'─'.repeat(width)}</Text>
+      <Footer state={state} session={controller.options.session} width={width} />
     </Box>
   </Box>;
 }

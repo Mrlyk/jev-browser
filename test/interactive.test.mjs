@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { Controller } from '../dist/interactive/controller.js';
-import { parseInteractive } from '../dist/interactive/options.js';
-import { navigationCommand } from '../dist/interactive/commands.js';
+import { browserArgs, parseInteractive } from '../dist/interactive/options.js';
+import { commands, navigationCommand, parseCommand } from '../dist/interactive/commands.js';
 import { clean } from '../dist/interactive/messages.js';
 import { edit, graphemes } from '../dist/interactive/editor.js';
 import { Jev } from '../dist/jev.js';
@@ -146,4 +146,42 @@ test('same-URL reload invalidates confirmation before a poll', async () => {
   assert.equal(s.controller.state.pending, undefined);
   assert.match(s.controller.state.transcript.at(-1).text, /重新加载/);
   await s.controller.shutdown();
+});
+
+test('TUI defaults to existing Chrome; only explicit launch modes start a new browser', () => {
+  const automatic = parseInteractive([]);
+  assert.equal(automatic.autoConnect, true);
+  assert.ok(browserArgs(automatic).includes('--auto-connect'));
+  assert.ok(!browserArgs(automatic).includes('--headed'));
+  for (const mode of ['--headed', '--headless']) {
+    const options = parseInteractive([mode]);
+    assert.ok(!options.autoConnect);
+    assert.deepEqual(browserArgs(options).slice(-2), ['--headed', String(mode === '--headed')]);
+    assert.throws(() => parseInteractive([mode, '--auto-connect']), { code: 'INVALID_ARGUMENT' });
+  }
+  assert.ok(!parseInteractive(['--cdp', '9222']).autoConnect);
+  assert.ok(!parseInteractive(['--session', 'existing']).autoConnect);
+  assert.throws(() => parseInteractive(['--headed', '--headless']), { code: 'INVALID_ARGUMENT' });
+});
+
+test('slash command menu exposes go, back, exit, tab and connect with legacy aliases', async () => {
+  for (const name of ['go', 'back', 'exit', 'tab', 'connect']) assert.ok(commands.some(([key]) => key === name));
+  for (const [old, name] of [['forward', 'go'], ['quit', 'exit'], ['tabs', 'tab'], ['browser', 'connect']])
+    assert.equal(parseCommand(`/${old}`).name, name);
+  const s = fixture(); await s.controller.start();
+  await s.controller.submit('/go'); assert.ok(s.calls.some(args => args[0] === 'forward'));
+  await s.controller.submit('/tab'); assert.equal(s.controller.state.choosingTab, true);
+  s.controller.cancel();
+  await s.controller.submit('/connect'); assert.equal(s.controller.state.choosingBrowser, true);
+  s.controller.cancel();
+  for (const mode of ['auto', 'headed', 'headless', 'cdp 9222', 'session chosen']) {
+    await s.controller.submit(`/connect ${mode}`); await s.controller.reconnect();
+    assert.equal(s.controller.options.autoConnect === true, mode === 'auto');
+    if (mode === 'headless') assert.equal(s.controller.options.headed, false);
+    if (mode === 'cdp 9222') assert.equal(s.controller.options.cdp, '9222');
+    if (mode === 'session chosen') assert.equal(s.controller.options.session, 'chosen');
+  }
+  assert.equal(s.requests.length, 0);
+  await s.controller.submit('/exit'); assert.equal(s.controller.state.exited, true);
+  assert.ok(!s.calls.some(args => args[0] === 'close'));
 });

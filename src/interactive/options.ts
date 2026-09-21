@@ -6,11 +6,11 @@ export type InteractiveOptions = { session: string; headed: boolean; cdp?: strin
 export const interactiveHelp = `用法：jevb tui [选项]
 
   --session <名称>                  复用指定会话（默认独立 tui-<id>）
-  --headed / --headless              新浏览器显示模式（默认有头）
-  --cdp <端口或URL> / --auto-connect  接入已有浏览器
+  --headed / --headless              新建有头或无头浏览器
+  --cdp <端口或URL> / --auto-connect  接入已有浏览器（默认自动连接）
   --model-provider <提供方>          auto、typesafe、openrouter
 
-输入自然语言操作浏览器，/help 查看快捷命令。退出默认保留浏览器。
+输入 / 查看命令，/connect 切换连接，/exit 退出并保留浏览器。
 `;
 
 export function parseInteractive(args: string[]): InteractiveOptions {
@@ -31,6 +31,10 @@ export function parseInteractive(args: string[]): InteractiveOptions {
   }
   if (!/^[a-zA-Z0-9_-]{1,48}$/.test(options.session)) throw new JevError('INVALID_SESSION', '会话名限 1–48 位字母、数字、下划线和短横线。');
   if (options.cdp && options.autoConnect) throw new JevError('INVALID_ARGUMENT', '--cdp 与 --auto-connect 不能同时使用。');
+  const launch = args.includes('--headed') || args.includes('--headless');
+  if (launch && (options.cdp || options.autoConnect)) throw new JevError('INVALID_ARGUMENT', '新建浏览器与连接已有浏览器的参数不能同时使用。');
+  if (args.includes('--headed') && args.includes('--headless')) throw new JevError('INVALID_ARGUMENT', '--headed 与 --headless 不能同时使用。');
+  if (!launch && !options.cdp && !args.includes('--session')) options.autoConnect = true;
   return options;
 }
 
